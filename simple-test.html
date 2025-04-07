@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Phaser 3 Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 800px;
+            height: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <script>
+        // Simple Phaser game
+        window.onload = function() {
+            console.log('Window loaded');
+            
+            // Define scenes
+            class MainScene extends Phaser.Scene {
+                constructor() {
+                    super({ key: 'MainScene' });
+                    console.log('MainScene constructor called');
+                }
+                
+                preload() {
+                    console.log('Preload started');
+                    // Create simple shapes
+                    const graphics = this.add.graphics();
+                    graphics.fillStyle(0xFFFFFF);
+                    graphics.fillRect(0, 0, 16, 16);
+                    graphics.generateTexture('player', 16, 16);
+                    graphics.destroy();
+                    console.log('Textures created');
+                }
+                
+                create() {
+                    console.log('Create function started');
+                    
+                    // Add text
+                    this.add.text(400, 100, 'Simple Phaser Test', { 
+                        fontSize: '32px', 
+                        fill: '#fff',
+                        fontFamily: 'Arial'
+                    }).setOrigin(0.5);
+                    
+                    // Add player
+                    this.player = this.physics.add.sprite(400, 300, 'player');
+                    this.player.setTint(0x00FF00);
+                    
+                    // Add input
+                    this.cursors = this.input.keyboard.createCursorKeys();
+                    
+                    console.log('Create function completed');
+                }
+                
+                update() {
+                    // Move player with arrow keys
+                    if (this.cursors.left.isDown) {
+                        this.player.x -= 3;
+                    } else if (this.cursors.right.isDown) {
+                        this.player.x += 3;
+                    }
+                    
+                    if (this.cursors.up.isDown) {
+                        this.player.y -= 3;
+                    } else if (this.cursors.down.isDown) {
+                        this.player.y += 3;
+                    }
+                }
+            }
+            
+            // Game configuration
+            const config = {
+                type: Phaser.AUTO,
+                width: 800,
+                height: 600,
+                backgroundColor: '#000000',
+                parent: 'game-container',
+                physics: {
+                    default: 'arcade',
+                    arcade: {
+                        gravity: { y: 0 }
+                    }
+                },
+                scene: [MainScene]
+            };
+            
+            // Create game
+            console.log('Creating game...');
+            const game = new Phaser.Game(config);
+            console.log('Game created');
+        };
+    </script>
+</body>
+</html> 

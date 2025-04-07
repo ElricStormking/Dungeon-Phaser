@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaser Diagnostic Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <script>
+        // Basic test to check if Phaser is working
+        window.onload = function() {
+            console.log('Diagnostics loaded');
+            
+            // Simple game configuration
+            const config = {
+                type: Phaser.AUTO,
+                width: 800,
+                height: 600,
+                backgroundColor: '#333333',
+                parent: 'game-container',
+                scene: {
+                    preload: preload,
+                    create: create,
+                    update: update
+                }
+            };
+            
+            // Start Phaser game
+            const game = new Phaser.Game(config);
+            
+            // Preload assets
+            function preload() {
+                console.log('Preload function running');
+                
+                // Create a simple square texture
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0xFFFFFF);
+                graphics.fillRect(0, 0, 16, 16);
+                graphics.generateTexture('square', 16, 16);
+                graphics.destroy();
+                console.log('Created square texture');
+            }
+            
+            // Create game objects
+            function create() {
+                console.log('Create function running');
+                
+                // Add title text
+                this.add.text(400, 100, 'DIAGNOSTIC TEST', {
+                    fontSize: '32px',
+                    fontFamily: 'Arial',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+                
+                // Add explanation
+                this.add.text(400, 150, 'If you can see this text, Phaser is working correctly', {
+                    fontSize: '18px',
+                    fontFamily: 'Arial',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+                
+                // Create a sprite
+                this.player = this.add.sprite(400, 300, 'square');
+                this.player.setScale(3);
+                this.player.setTint(0x00FF00);
+                
+                // Add instructions
+                this.add.text(400, 400, 'Use arrow keys to move the square', {
+                    fontSize: '18px',
+                    fontFamily: 'Arial',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+                
+                // Setup cursor keys
+                this.cursors = this.input.keyboard.createCursorKeys();
+            }
+            
+            // Update game state
+            function update() {
+                // Handle input
+                if (this.cursors.left.isDown) {
+                    this.player.x -= 3;
+                } else if (this.cursors.right.isDown) {
+                    this.player.x += 3;
+                }
+                
+                if (this.cursors.up.isDown) {
+                    this.player.y -= 3;
+                } else if (this.cursors.down.isDown) {
+                    this.player.y += 3;
+                }
+            }
+        };
+    </script>
+</body>
+</html> 

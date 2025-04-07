@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Survivors - Pixel Art Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        #loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        #error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            text-align: center;
+            background-color: rgba(255, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading-message">Loading game assets...</div>
+        <div id="error-message"></div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <script>
+        // Show loading message
+        document.getElementById('loading-message').style.display = 'block';
+        
+        // Global error handler
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error("Error occurred:", message, "at", source, "line", lineno);
+            const errorElement = document.getElementById('error-message');
+            errorElement.innerHTML = `<strong>Error:</strong> ${message}<br>
+                                      <small>at ${source} line ${lineno}</small><br><br>
+                                      <button onclick="location.reload()">Reload Page</button>`;
+            errorElement.style.display = 'block';
+            document.getElementById('loading-message').style.display = 'none';
+            return true; // Prevents the default browser error message
+        };
+        
+        // Add willReadFrequently attribute to Canvas contexts
+        const originalGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type, attributes) {
+            if (type === '2d') {
+                if (!attributes) {
+                    attributes = {};
+                }
+                attributes.willReadFrequently = true;
+            }
+            return originalGetContext.call(this, type, attributes);
+        };
+        
+        // Check if Phaser loaded correctly
+        window.addEventListener('load', function() {
+            if (typeof Phaser === 'undefined') {
+                document.getElementById('loading-message').innerHTML = 
+                    'Failed to load Phaser library. Please check your internet connection and refresh the page.';
+            } else {
+                console.log('Phaser library loaded successfully', Phaser.VERSION);
+                setTimeout(() => document.getElementById('loading-message').style.display = 'none', 500);
+            }
+        });
+    </script>
+    <!-- Load game scripts directly instead of dynamically -->
+    <script src="assets.js"></script>
+    <script src="game.js"></script>
+</body>
+</html> 
