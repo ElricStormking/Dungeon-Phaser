@@ -1,0 +1,33 @@
+Game Design document
+
+##Mechanics
+Snake + Vampire Survivor
+"Nimble Quest" like
+
+Fantasy Classes
+Commanders(avatars)
+engineers(followers)
+Attack Styles for fantasy classs
+Spawning Upgrades
+
+##Controls
+WASD 4 directions movements
+Auto-Attacks
+
+##Levels
+5 stages and 50 levels
+Enemy Waves
+Enemies
+Bosses
+
+##Visuals
+Pixel Art
+Attack Style Visuals
+
+Userflow
+Title Screen
+Multi-path Map design like "Slay the spire"
+Stages and Levels
+
+
+

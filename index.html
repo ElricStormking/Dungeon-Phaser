@@ -53,52 +53,12 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="loading-message">Loading game assets...</div>
-        <div id="error-message"></div>
+        <div id="loading-message" style="color: white; text-align: center; padding-top: 50px;">Loading Game...</div>
+        <div id="error-message" style="color: red; background-color: #333; border: 1px solid red; padding: 10px; margin: 20px; display: none;"></div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
-    <script>
-        // Show loading message
-        document.getElementById('loading-message').style.display = 'block';
-        
-        // Global error handler
-        window.onerror = function(message, source, lineno, colno, error) {
-            console.error("Error occurred:", message, "at", source, "line", lineno);
-            const errorElement = document.getElementById('error-message');
-            errorElement.innerHTML = `<strong>Error:</strong> ${message}<br>
-                                      <small>at ${source} line ${lineno}</small><br><br>
-                                      <button onclick="location.reload()">Reload Page</button>`;
-            errorElement.style.display = 'block';
-            document.getElementById('loading-message').style.display = 'none';
-            return true; // Prevents the default browser error message
-        };
-        
-        // Add willReadFrequently attribute to Canvas contexts
-        const originalGetContext = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type, attributes) {
-            if (type === '2d') {
-                if (!attributes) {
-                    attributes = {};
-                }
-                attributes.willReadFrequently = true;
-            }
-            return originalGetContext.call(this, type, attributes);
-        };
-        
-        // Check if Phaser loaded correctly
-        window.addEventListener('load', function() {
-            if (typeof Phaser === 'undefined') {
-                document.getElementById('loading-message').innerHTML = 
-                    'Failed to load Phaser library. Please check your internet connection and refresh the page.';
-            } else {
-                console.log('Phaser library loaded successfully', Phaser.VERSION);
-                setTimeout(() => document.getElementById('loading-message').style.display = 'none', 500);
-            }
-        });
-    </script>
-    <!-- Load game scripts directly instead of dynamically -->
-    <script src="assets.js"></script>
-    <script src="game.js"></script>
+    <!-- Load Phaser from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <!-- Load main game file as a module -->
+    <script type="module" src="src/main.js"></script>
 </body>
 </html> 
