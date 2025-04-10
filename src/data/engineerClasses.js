@@ -343,7 +343,7 @@ export const engineerClasses = {
             if (!closestEnemy) return false;
 
             const angle = Phaser.Math.Angle.Between(follower.x, follower.y, closestEnemy.x, closestEnemy.y);
-            const beamLength = GAME_WIDTH; // Use game width or a large fixed number
+            const beamLength = GAME_WIDTH / 2; // Reduced to 50% of original range
             const beamWidth = TILE_SIZE; // For collision checking
             const endX = follower.x + Math.cos(angle) * beamLength;
             const endY = follower.y + Math.sin(angle) * beamLength;
@@ -524,6 +524,11 @@ export const engineerClasses = {
             const mushroomCount = 3;
             let mushroomsPlaced = 0;
             const targetEnemies = Phaser.Utils.Array.Shuffle(enemies.getChildren().filter(e => e.active)).slice(0, mushroomCount);
+            
+            // Visual properties for mushroom bombs
+            const mushroomRadius = TILE_SIZE * 2;
+            const explosionDelay = 3000;
+            const damage = 3;
 
             targetEnemies.forEach(enemy => {
                 const offsetX = Phaser.Math.Between(-TILE_SIZE * 2, TILE_SIZE * 2);
@@ -531,7 +536,23 @@ export const engineerClasses = {
                 let mushroomX = Phaser.Math.Clamp(enemy.x + offsetX, TILE_SIZE, GAME_WIDTH - TILE_SIZE);
                 let mushroomY = Phaser.Math.Clamp(enemy.y + offsetY, TILE_SIZE, GAME_HEIGHT - TILE_SIZE);
                 
-                scene.createTimedExplosion(mushroomX, mushroomY, 'shroom', 3000);
+                // Create mushroom visual effect before explosion
+                const mushroom = scene.add.graphics();
+                mushroom.fillStyle(0xFF69B4, 0.5);
+                mushroom.fillCircle(mushroomX, mushroomY, mushroomRadius * 0.5);
+                
+                scene.tweens.add({
+                    targets: mushroom,
+                    alpha: 0.8,
+                    scale: 1.2,
+                    duration: 500,
+                    yoyo: true,
+                    repeat: 2,
+                    onComplete: () => mushroom.destroy()
+                });
+                
+                // Create a custom timed explosion with mushroom-themed colors
+                createCustomTimedExplosion(scene, mushroomX, mushroomY, mushroomRadius, explosionDelay, damage, 0xFF69B4);
                 mushroomsPlaced++;
             });
 
@@ -541,9 +562,133 @@ export const engineerClasses = {
                 const distance = Phaser.Math.Between(TILE_SIZE * 2, TILE_SIZE * 5);
                 let mushroomX = Phaser.Math.Clamp(follower.x + Math.cos(angle) * distance, TILE_SIZE, GAME_WIDTH - TILE_SIZE);
                 let mushroomY = Phaser.Math.Clamp(follower.y + Math.sin(angle) * distance, TILE_SIZE, GAME_HEIGHT - TILE_SIZE);
-                scene.createTimedExplosion(mushroomX, mushroomY, 'shroom', 3000);
+                
+                // Create mushroom visual effect before explosion
+                const mushroom = scene.add.graphics();
+                mushroom.fillStyle(0xFF69B4, 0.5);
+                mushroom.fillCircle(mushroomX, mushroomY, mushroomRadius * 0.5);
+                
+                scene.tweens.add({
+                    targets: mushroom,
+                    alpha: 0.8,
+                    scale: 1.2,
+                    duration: 500,
+                    yoyo: true,
+                    repeat: 2,
+                    onComplete: () => mushroom.destroy()
+                });
+                
+                // Create a custom timed explosion with mushroom-themed colors
+                createCustomTimedExplosion(scene, mushroomX, mushroomY, mushroomRadius, explosionDelay, damage, 0xFF69B4);
                 mushroomsPlaced++;
             }
+            
+            // Helper function for custom timed explosion with mushroom colors
+            function createCustomTimedExplosion(scene, x, y, radius, delay, damage, color) {
+                // Create visual indicator for the timed bomb (mushroom-themed)
+                const indicator = scene.add.graphics();
+                indicator.fillStyle(color, 0.3); // Using mushroom color instead of red
+                indicator.fillCircle(x, y, radius);
+                
+                // Add countdown effect
+                const countdownText = scene.add.text(x, y, (delay / 1000).toFixed(1), {
+                    fontSize: '24px',
+                    fontFamily: 'Arial',
+                    fill: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(0.5);
+                
+                // Pulsing effect for the indicator
+                scene.tweens.add({
+                    targets: indicator,
+                    alpha: 0.6,
+                    scale: 1.1,
+                    duration: 500,
+                    yoyo: true,
+                    repeat: -1
+                });
+                
+                // Update countdown text
+                let remainingTime = delay;
+                const updateInterval = 100; // Update every 100ms
+                const countdownTimer = scene.time.addEvent({
+                    delay: updateInterval,
+                    callback: () => {
+                        remainingTime -= updateInterval;
+                        countdownText.setText((remainingTime / 1000).toFixed(1));
+                    },
+                    repeat: Math.floor(delay / updateInterval) - 1
+                });
+                
+                // Trigger explosion after delay
+                scene.time.delayedCall(delay, () => {
+                    // Stop and clean up countdown elements
+                    if (countdownTimer && countdownTimer.active) countdownTimer.remove();
+                    indicator.destroy();
+                    countdownText.destroy();
+                    
+                    // Create explosion effect with mushroom color
+                    const explosion = scene.add.graphics();
+                    explosion.fillStyle(color, 0.7); // Using mushroom color
+                    explosion.fillCircle(x, y, radius);
+                    
+                    // Add particle effect with mushroom color
+                    const particles = scene.add.particles(x, y, 'particle', {
+                        speed: { min: 50, max: 200 },
+                        scale: { start: 1, end: 0 },
+                        lifespan: 800,
+                        quantity: 30,
+                        tint: [color, 0xFFAADD, 0xFFDDEE], // Mushroom-themed particle colors
+                        blendMode: 'ADD',
+                        emitting: false
+                    });
+                    
+                    particles.explode(30);
+                    
+                    // Camera shake effect
+                    scene.cameras.main.shake(300, 0.01);
+                    
+                    // Damage enemies within radius
+                    scene.enemies.getChildren().forEach(enemy => {
+                        if (!enemy.active) return;
+                        
+                        const distance = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+                        if (distance <= radius) {
+                            // Apply damage
+                            if (enemy.damage) {
+                                enemy.damage(damage);
+                            } else {
+                                enemy.health -= damage;
+                            }
+                            
+                            // Add knockback effect
+                            const angle = Phaser.Math.Angle.Between(x, y, enemy.x, enemy.y);
+                            const knockbackForce = 200 * (1 - distance / radius); // More force closer to center
+                            
+                            if (enemy.body) {
+                                enemy.body.velocity.x += Math.cos(angle) * knockbackForce;
+                                enemy.body.velocity.y += Math.sin(angle) * knockbackForce;
+                            }
+                        }
+                    });
+                    
+                    // Fade out and cleanup
+                    scene.tweens.add({
+                        targets: explosion,
+                        alpha: 0,
+                        scale: 1.5,
+                        duration: 500,
+                        onComplete: () => {
+                            explosion.destroy();
+                            scene.time.delayedCall(800, () => {
+                                if (particles && particles.active) particles.destroy();
+                            });
+                        }
+                    });
+                });
+            }
+            
             return mushroomsPlaced > 0;
         }
     },
@@ -630,13 +775,115 @@ export const engineerClasses = {
             const mineCount = 3;
             let minesPlaced = 0;
             
+            // Mine properties
+            const mineRadius = TILE_SIZE * 1.5;
+            const explosionDelay = 8000;
+            const damage = 4;
+            
             for (let i = 0; i < mineCount; i++) {
                 const angle = (Math.PI * 2 / mineCount) * i + Math.random() * 0.5 - 0.25; // Add some randomness
                 const distance = TILE_SIZE * Phaser.Math.Between(2, 4);
                 let mineX = Phaser.Math.Clamp(follower.x + Math.cos(angle) * distance, TILE_SIZE, GAME_WIDTH - TILE_SIZE);
                 let mineY = Phaser.Math.Clamp(follower.y + Math.sin(angle) * distance, TILE_SIZE, GAME_HEIGHT - TILE_SIZE);
                 
-                scene.createTimedExplosion(mineX, mineY, 'mine', 8000);
+                // Create mine visual - this replaces the red circle visual from createTimedExplosion
+                const mine = scene.add.graphics();
+                mine.lineStyle(2, 0x32CD32, 1);
+                mine.strokeCircle(mineX, mineY, mineRadius * 0.4);
+                mine.fillStyle(0x32CD32, 0.3);
+                mine.fillCircle(mineX, mineY, mineRadius * 0.4);
+                
+                // Add countdown text
+                const countdownText = scene.add.text(mineX, mineY, (explosionDelay / 1000).toFixed(1), {
+                    fontSize: '20px',
+                    fontFamily: 'Arial',
+                    fill: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(0.5);
+                
+                // Blinking effect
+                scene.tweens.add({
+                    targets: mine,
+                    alpha: 0.1,
+                    duration: 500,
+                    yoyo: true,
+                    repeat: Math.floor(explosionDelay / 1000) - 1
+                });
+                
+                // Update countdown text
+                const updateInterval = 1000; // Update every second
+                const countdownTimer = scene.time.addEvent({
+                    delay: updateInterval,
+                    callback: () => {
+                        const remainingTime = Math.max(0, (countdownTimer.getOverallRemaining() / 1000)).toFixed(1);
+                        countdownText.setText(remainingTime);
+                    },
+                    repeat: Math.floor(explosionDelay / updateInterval) - 1
+                });
+                
+                // Trigger explosion after delay
+                scene.time.delayedCall(explosionDelay, () => {
+                    // Clean up visuals
+                    mine.destroy();
+                    countdownText.destroy();
+                    
+                    // Create explosion effect with green color
+                    const explosion = scene.add.graphics();
+                    explosion.fillStyle(0x32CD32, 0.7); // Use green instead of red
+                    explosion.fillCircle(mineX, mineY, mineRadius);
+                    
+                    // Add particles
+                    const particles = scene.add.particles(mineX, mineY, 'particle', {
+                        speed: { min: 50, max: 200 },
+                        scale: { start: 1, end: 0 },
+                        lifespan: 800,
+                        quantity: 30,
+                        tint: [0x32CD32, 0x228B22, 0x006400], // Green colors
+                        blendMode: 'ADD',
+                        emitting: false
+                    });
+                    
+                    particles.explode(30);
+                    
+                    // Camera shake effect
+                    scene.cameras.main.shake(300, 0.01);
+                    
+                    // Damage enemies within radius
+                    scene.enemies.getChildren().forEach(enemy => {
+                        if (!enemy.active) return;
+                        
+                        const distance = Phaser.Math.Distance.Between(mineX, mineY, enemy.x, enemy.y);
+                        if (distance <= mineRadius) {
+                            // Apply damage
+                            helpers.damageEnemy(scene, enemy, damage);
+                            
+                            // Add knockback effect
+                            const angle = Phaser.Math.Angle.Between(mineX, mineY, enemy.x, enemy.y);
+                            const knockbackForce = 200 * (1 - distance / mineRadius);
+                            
+                            if (enemy.body) {
+                                enemy.body.velocity.x += Math.cos(angle) * knockbackForce;
+                                enemy.body.velocity.y += Math.sin(angle) * knockbackForce;
+                            }
+                        }
+                    });
+                    
+                    // Fade out and cleanup
+                    scene.tweens.add({
+                        targets: explosion,
+                        alpha: 0,
+                        scale: 1.5,
+                        duration: 500,
+                        onComplete: () => {
+                            explosion.destroy();
+                            scene.time.delayedCall(800, () => {
+                                if (particles && particles.active) particles.destroy();
+                            });
+                        }
+                    });
+                });
+                
                 minesPlaced++;
             }
             return minesPlaced > 0;
@@ -650,31 +897,69 @@ export const engineerClasses = {
         specialAttack: function(scene, follower, enemies, helpers) {
             if (enemies.getLength() === 0) return false;
             
-            // Find densest cluster of enemies
+            // Max distance the cloud can be placed from the shaman
+            const maxDistanceFromShaman = TILE_SIZE * 4;
+            const cloudRadius = TILE_SIZE * 3;
+            
+            // Find densest cluster of enemies, but only consider enemies near the shaman
             let bestLocation = { x: follower.x, y: follower.y };
             let maxScore = -1;
-            const cloudRadius = TILE_SIZE * 3;
-
-            // Check around a few random enemies and the follower
-            const checkPoints = Phaser.Utils.Array.Shuffle(enemies.getChildren().filter(e => e.active)).slice(0, 5);
-            checkPoints.push(follower);
-
-            checkPoints.forEach(center => {
+            
+            // Get nearby enemies
+            const nearbyEnemies = enemies.getChildren().filter(e => 
+                e.active && Phaser.Math.Distance.Between(follower.x, follower.y, e.x, e.y) <= maxDistanceFromShaman
+            );
+            
+            // If no nearby enemies, place cloud at shaman's position
+            if (nearbyEnemies.length === 0) {
+                scene.createPoisonCloud(follower.x, follower.y, cloudRadius);
+                return true;
+            }
+            
+            // Check around nearby enemies for the densest cluster
+            nearbyEnemies.forEach(center => {
                 let score = 0;
                 enemies.getChildren().forEach(enemy => {
                     if (enemy.active && Phaser.Math.Distance.Between(center.x, center.y, enemy.x, enemy.y) <= cloudRadius) {
                         score++;
                     }
                 });
-                if (score > maxScore) {
+                
+                // Also consider distance from shaman (prefer closer locations)
+                const distanceFromShaman = Phaser.Math.Distance.Between(follower.x, follower.y, center.x, center.y);
+                if (distanceFromShaman <= maxDistanceFromShaman && score > maxScore) {
                     maxScore = score;
                     bestLocation = { x: center.x, y: center.y };
                 }
             });
-
+            
             // Clamp location to game bounds
             bestLocation.x = Phaser.Math.Clamp(bestLocation.x, cloudRadius, GAME_WIDTH - cloudRadius);
             bestLocation.y = Phaser.Math.Clamp(bestLocation.y, cloudRadius, GAME_HEIGHT - cloudRadius);
+
+            // Final check to ensure cloud is within max distance
+            const finalDistance = Phaser.Math.Distance.Between(follower.x, follower.y, bestLocation.x, bestLocation.y);
+            if (finalDistance > maxDistanceFromShaman) {
+                // If too far, move the cloud position closer to the shaman
+                const angle = Phaser.Math.Angle.Between(follower.x, follower.y, bestLocation.x, bestLocation.y);
+                bestLocation.x = follower.x + Math.cos(angle) * maxDistanceFromShaman;
+                bestLocation.y = follower.y + Math.sin(angle) * maxDistanceFromShaman;
+                
+                // Clamp again after adjustment
+                bestLocation.x = Phaser.Math.Clamp(bestLocation.x, cloudRadius, GAME_WIDTH - cloudRadius);
+                bestLocation.y = Phaser.Math.Clamp(bestLocation.y, cloudRadius, GAME_HEIGHT - cloudRadius);
+            }
+
+            // Add a visual indicator showing connection between shaman and cloud
+            const connector = scene.add.graphics();
+            connector.lineStyle(3, 0x556B2F, 0.6);
+            connector.lineBetween(follower.x, follower.y, bestLocation.x, bestLocation.y);
+            scene.tweens.add({
+                targets: connector,
+                alpha: 0,
+                duration: 1000,
+                onComplete: () => connector.destroy()
+            });
 
             scene.createPoisonCloud(bestLocation.x, bestLocation.y, cloudRadius);
             return true;

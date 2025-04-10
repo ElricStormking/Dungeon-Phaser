@@ -48,18 +48,15 @@ function handleCharacterDeath(scene, character) {
         // Check if it's an enemy
         if (scene.enemies && scene.enemies.contains(character)) { 
             scene.score = (scene.score || 0) + (character.scoreValue || 5);
-            if(scene.scoreText) scene.scoreText.setText('Score: ' + scene.score);
+            if(scene.uiManager) scene.uiManager.updateScore(scene.score);
             scene.addExperience(character.experienceValue || 10); // Call scene method for EXP
             scene.enemies.remove(character, true, true); 
         } 
-        // Check if it's a follower (assuming followers are now in a group)
+        // Check if it's a follower
         else if (scene.followersGroup && scene.followersGroup.contains(character)) {
-            // Find the index in the snake array for movement logic updates
-             const followerIndex = scene.followers.indexOf(character);
-              if (followerIndex !== -1) {
-                 scene.followers.splice(followerIndex, 1);
-             }
-             scene.followersGroup.remove(character, true, true); 
+            // No need to manually splice from the followers array
+            // The moveSnake method will automatically filter out inactive followers
+            scene.followersGroup.remove(character, true, true); 
          }
          // Default destroy if not found in expected groups (e.g., temporary sprites)
          else {
@@ -91,20 +88,21 @@ export function createExplosion(scene, x, y, color = 0xFFFFFF) {
 
     if (!emitter) return; 
 
+    // Store a reference to scene for safety check
+    emitter.sceneRef = scene;
+
     emitter.explode(15); // Explode particles once
 
-    // Automatically clean up the emitter after its lifespan
-    // Option 1: Use a timer (simple)
+    // Automatically clean up the emitter after its lifespan with safety check
     scene.time.delayedCall(500, () => {
-        if (emitter) emitter.destroy(); // Destroy the emitter itself
+        // Check if the scene and emitter still exist
+        if (emitter && emitter.sceneRef && emitter.sceneRef.scene.isActive && !emitter.destroyed) {
+            safeDestroy(emitter);
+        }
     });
-    // Option 2: Listen for emitter completion (more robust if lifespan varies a lot)
-    // emitter.onParticleEmitComplete = () => emitter.destroy(); 
-    // Note: onParticleEmitComplete might not exist; check docs if needed.
-    // Using lifespan + timer is generally reliable for simple explosions.
 }
 
-export function createLightningEffect(scene, x1, y1, x2, y2) {
+export function createLightningEffect(scene, x1, y1, x2, y2, graphicsArray = []) {
     const segments = Phaser.Math.Between(5, 10);
     const jitter = 10;
     const line = scene.add.graphics();
@@ -121,11 +119,46 @@ export function createLightningEffect(scene, x1, y1, x2, y2) {
     line.lineTo(x2, y2);
     line.strokePath();
     
-    scene.tweens.add({targets: line, alpha: 0, duration: 250, delay: 50, onComplete: ()=> line.destroy()});
+    // Add to graphics array if provided (for batch cleanup)
+    if (graphicsArray && Array.isArray(graphicsArray)) {
+        graphicsArray.push(line);
+    }
+    
+    // Add particle effects at the impact point
+    const impactParticles = scene.add.particles(x2, y2, 'particle', {
+        speed: { min: 30, max: 80 },
+        scale: { start: 0.4, end: 0 },
+        lifespan: 200,
+        quantity: 5,
+        emitting: false,
+        tint: 0x00FFFF
+    });
+    
+    // Emit once
+    impactParticles.explode(5);
+    
+    // Fade out the lightning line
+    scene.tweens.add({
+        targets: line, 
+        alpha: 0, 
+        duration: 250, 
+        delay: 50, 
+        onComplete: () => {
+            line.destroy();
+            // Clean up particles after they fade
+            scene.time.delayedCall(200, () => {
+                if (impactParticles) impactParticles.destroy();
+            });
+        }
+    });
+    
+    return line;
 }
 
 // Helper for jagged lines (used by Thunder Mage)
 export function createJaggedLine(graphics, x1, y1, x2, y2, segments, jitter) {
+    if (!graphics || !graphics.active) return;
+    
     graphics.beginPath();
     graphics.moveTo(x1, y1);
     for (let i = 1; i < segments; i++) {
@@ -182,6 +215,195 @@ export function setAngleFromDirection(sprite, direction) {
     }
 }
 
+/**
+ * Creates a poison cloud effect that damages enemies over time
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {number} x - X position of cloud center
+ * @param {number} y - Y position of cloud center
+ * @param {number} radius - Radius of the cloud effect
+ */
+export function createPoisonCloud(scene, x, y, radius) {
+    // Create the visual cloud
+    const cloud = scene.add.graphics();
+    cloud.fillStyle(0x00FF00, 0.3);
+    cloud.fillCircle(x, y, radius);
+    
+    // Add particles inside the cloud with Phaser 3.60 syntax
+    const particles = scene.add.particles(x, y, 'particle', {
+        speed: { min: 10, max: 30 },
+        scale: { start: 0.5, end: 0 },
+        lifespan: 1000,
+        quantity: 1,
+        frequency: 50,
+        tint: 0x00FF00,
+        blendMode: 'ADD',
+        emitting: true,
+        gravityY: -10,
+        bounds: { radius: radius * 0.8 }
+    });
+    
+    // Damage interval (damage enemies every 500ms)
+    let damageTimer = scene.time.addEvent({
+        delay: 500,
+        callback: () => {
+            scene.enemies.getChildren().forEach(enemy => {
+                if (!enemy.active) return;
+                
+                const distance = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+                if (distance <= radius) {
+                    // Apply poison damage
+                    damageEnemy(scene, enemy, 1);
+                    
+                    // Slow the enemy
+                    if (!enemy.isPoisoned) {
+                        enemy.isPoisoned = true;
+                        enemy.setTint(0x00FF00);
+                        
+                        if (!enemy.originalSpeed) {
+                            enemy.originalSpeed = enemy.speed;
+                        }
+                        enemy.speed = enemy.originalSpeed * 0.6;
+                    }
+                }
+            });
+        },
+        repeat: 5 // Total 6 damage ticks (3 seconds)
+    });
+    
+    // Fade out and cleanup
+    scene.tweens.add({
+        targets: cloud,
+        alpha: 0,
+        duration: 3000,
+        onComplete: () => {
+            cloud.destroy();
+            if (particles && particles.active) particles.destroy();
+            if (damageTimer && damageTimer.active) damageTimer.remove();
+            
+            // Restore enemy speeds
+            scene.enemies.getChildren().forEach(enemy => {
+                if (enemy.active && enemy.isPoisoned) {
+                    enemy.isPoisoned = false;
+                    enemy.clearTint();
+                    if (enemy.originalSpeed) {
+                        enemy.speed = enemy.originalSpeed;
+                    }
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Creates a timed explosion effect that damages enemies after a delay
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {number} x - X position of explosion center
+ * @param {number} y - Y position of explosion center
+ * @param {number} radius - Radius of the explosion effect
+ * @param {number} delay - Delay in ms before explosion occurs
+ * @param {number} damage - Amount of damage to deal to enemies
+ */
+export function createTimedExplosion(scene, x, y, radius = 80, delay = 1500, damage = 3) {
+    // Create visual indicator for the timed bomb
+    const indicator = scene.add.graphics();
+    indicator.fillStyle(0xFF0000, 0.3);
+    indicator.fillCircle(x, y, radius);
+    
+    // Add countdown effect
+    const countdownText = scene.add.text(x, y, (delay / 1000).toFixed(1), {
+        fontSize: '24px',
+        fontFamily: 'Arial',
+        fill: '#FFFFFF',
+        stroke: '#000000',
+        strokeThickness: 3
+    }).setOrigin(0.5);
+    
+    // Pulsing effect for the indicator
+    scene.tweens.add({
+        targets: indicator,
+        alpha: 0.6,
+        scale: 1.1,
+        duration: 500,
+        yoyo: true,
+        repeat: -1
+    });
+    
+    // Update countdown text
+    let remainingTime = delay;
+    const updateInterval = 100; // Update every 100ms
+    const countdownTimer = scene.time.addEvent({
+        delay: updateInterval,
+        callback: () => {
+            remainingTime -= updateInterval;
+            countdownText.setText((remainingTime / 1000).toFixed(1));
+        },
+        repeat: Math.floor(delay / updateInterval) - 1
+    });
+    
+    // Trigger explosion after delay
+    scene.time.delayedCall(delay, () => {
+        // Stop and clean up countdown elements
+        if (countdownTimer && countdownTimer.active) countdownTimer.remove();
+        indicator.destroy();
+        countdownText.destroy();
+        
+        // Create explosion effect
+        const explosion = scene.add.graphics();
+        explosion.fillStyle(0xFF0000, 0.7);
+        explosion.fillCircle(x, y, radius);
+        
+        // Add particle effect with updated Phaser 3.60 syntax
+        const particles = scene.add.particles(x, y, 'particle', {
+            speed: { min: 50, max: 200 },
+            scale: { start: 1, end: 0 },
+            lifespan: 800,
+            quantity: 30,
+            tint: [0xFF0000, 0xFF5500, 0xFFAA00],
+            blendMode: 'ADD',
+            emitting: false
+        });
+        
+        particles.explode(30);
+        
+        // Camera shake effect
+        scene.cameras.main.shake(300, 0.01);
+        
+        // Damage enemies within radius
+        scene.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active) return;
+            
+            const distance = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+            if (distance <= radius) {
+                // Apply damage
+                damageEnemy(scene, enemy, damage);
+                
+                // Add knockback effect
+                const angle = Phaser.Math.Angle.Between(x, y, enemy.x, enemy.y);
+                const knockbackForce = 200 * (1 - distance / radius); // More force closer to center
+                
+                if (enemy.body) {
+                    enemy.body.velocity.x += Math.cos(angle) * knockbackForce;
+                    enemy.body.velocity.y += Math.sin(angle) * knockbackForce;
+                }
+            }
+        });
+        
+        // Fade out and cleanup
+        scene.tweens.add({
+            targets: explosion,
+            alpha: 0,
+            scale: 1.5,
+            duration: 500,
+            onComplete: () => {
+                explosion.destroy();
+                scene.time.delayedCall(800, () => {
+                    if (particles && particles.active) particles.destroy();
+                });
+            }
+        });
+    });
+}
+
 // --- Placeholder/Complex Ability Helpers (Require specific logic not suitable for generic helper) ---
 
 // These functions (explodeMushroom, explodeMine, applyPoison, createPoisonCloud, createTimedExplosion)
@@ -192,3 +414,26 @@ export function setAngleFromDirection(sprite, direction) {
 // Keeping them separate requires passing too much context (enemies group, specific particle configs etc.)
 
 // Example: Removing explodeMushroom - its logic should be called from Shroom Pixie's attack 
+
+// --- Callback helper to safely update text ---
+export function updateText(textObject, newText) {
+    if (!textObject || !textObject.active || !textObject.scene) return;
+    try {
+        textObject.setText(newText);
+    } catch (e) {
+        console.warn('Error updating text:', e);
+    }
+}
+
+// --- Safe cleanup for particles and graphics ---
+export function safeDestroy(object) {
+    if (!object) return;
+    
+    try {
+        if (typeof object.destroy === 'function') {
+            object.destroy();
+        }
+    } catch (e) {
+        console.warn('Error safely destroying object:', e);
+    }
+} 

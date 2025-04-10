@@ -11,7 +11,61 @@ export const heroClasses = {
             const range = TILE_SIZE * 3;
             let enemiesHit = 0;
             
-            for (let i = 0; i < enemies.getLength(); i++) { // Assuming enemies is a Group
+            // Create spinning sword effect - 360 degrees
+            const numSwords = 6; // Number of sword sprites to create for the spin
+            const swordLength = range * 0.9;
+            
+            for (let i = 0; i < numSwords; i++) {
+                // Create sword sprite
+                const startAngle = (i * (Math.PI * 2 / numSwords));
+                const sword = scene.add.sprite(player.x, player.y, 'bullet');
+                sword.setTint(0xFFFF00);
+                sword.setAlpha(0.7);
+                sword.setScale(3, 0.5); // Long and thin like a sword
+                sword.setOrigin(0, 0.5); // Set origin to left-center for rotation
+                sword.setDepth(player.depth + 1);
+                
+                // Set initial angle
+                sword.rotation = startAngle;
+                
+                // Add rotation animation - offset the start time for each sword
+                scene.tweens.add({
+                    targets: sword,
+                    rotation: startAngle + Math.PI * 2, // Full 360 degree rotation
+                    duration: 500,
+                    ease: 'Sine.easeInOut',
+                    delay: i * (500 / numSwords), // Stagger the start times
+                    onUpdate: function(tween) {
+                        // Add particles along the sword edge for trail effect
+                        if (tween.progress > 0.05 && tween.progress < 0.95) {
+                            try {
+                                const tipX = sword.x + Math.cos(sword.rotation) * swordLength;
+                                const tipY = sword.y + Math.sin(sword.rotation) * swordLength;
+                                
+                                // Add particle at tip of sword
+                                const particles = scene.add.particles(tipX, tipY, 'particle', {
+                                    lifespan: 300,
+                                    scale: { start: 0.4, end: 0 },
+                                    quantity: 1,
+                                    alpha: { start: 0.7, end: 0 },
+                                    tint: 0xFFFF00
+                                });
+                                
+                                // Clean up particles
+                                scene.time.delayedCall(300, () => {
+                                    if (particles) particles.destroy();
+                                });
+                            } catch (e) {
+                                // Continue even if particles can't be created
+                            }
+                        }
+                    },
+                    onComplete: () => sword.destroy()
+                });
+            }
+            
+            // Check for enemies in range and damage them
+            for (let i = 0; i < enemies.getLength(); i++) {
                 const enemy = enemies.getChildren()[i];
                 const distance = Phaser.Math.Distance.Between(player.x, player.y, enemy.x, enemy.y);
                 
@@ -19,28 +73,23 @@ export const heroClasses = {
                     helpers.createExplosion(scene, enemy.x, enemy.y, 0xFFFF00);
                     // Damage enemy instead of just destroying
                     helpers.damageEnemy(scene, enemy, 5); // Example damage value
-                    // Let damageEnemy handle destruction & score
+                    
+                    // Knockback effect
+                    const knockbackAngle = Phaser.Math.Angle.Between(player.x, player.y, enemy.x, enemy.y);
+                    if (enemy.body) {
+                        enemy.body.velocity.x += Math.cos(knockbackAngle) * 150;
+                        enemy.body.velocity.y += Math.sin(knockbackAngle) * 150;
+                        scene.tweens.add({
+                            targets: enemy.body.velocity,
+                            x: '*=0.5',
+                            y: '*=0.5',
+                            duration: 300
+                        });
+                    }
+                    
                     enemiesHit++;
-                    // Reset loop index if enemy is destroyed by damageEnemy
-                    // (Need to adjust if damageEnemy doesn't remove immediately)
-                    // i--; 
                 }
             }
-            
-            // Visual effect for sword sweep
-            const sweep = scene.add.graphics();
-            sweep.fillStyle(0xFFFF00, 0.3);
-            sweep.fillCircle(player.x, player.y, range);
-            
-            // Fade out and destroy
-            scene.tweens.add({
-                targets: sweep,
-                alpha: 0,
-                duration: 300,
-                onComplete: () => {
-                    sweep.destroy();
-                }
-            });
             
             return enemiesHit > 0;
         }
@@ -48,15 +97,57 @@ export const heroClasses = {
     archer: {
         name: 'Archer',
         color: 0x00FF00,
-        specialAttack: function(scene, player, enemies, helpers) { // helpers param is no longer needed here
+        specialAttack: function(scene, player, enemies, helpers) {
             // Fire arrows in 8 directions
             const directions = [
                 {x: 1, y: 0}, {x: 1, y: 1}, {x: 0, y: 1}, {x: -1, y: 1},
                 {x: -1, y: 0}, {x: -1, y: -1}, {x: 0, y: -1}, {x: 1, y: -1}
             ];
             
+            // Normalize diagonal directions for consistent speed
             directions.forEach(dir => {
-                scene.shootProjectile(player.x, player.y, dir.x, dir.y, 'arrow');
+                if (dir.x !== 0 && dir.y !== 0) {
+                    const length = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+                    dir.x /= length;
+                    dir.y /= length;
+                }
+            });
+            
+            // Fire arrows manually instead of using shootProjectile
+            directions.forEach(dir => {
+                // Create arrow directly
+                const arrow = scene.add.sprite(player.x, player.y, 'arrow');
+                arrow.setScale(1.2);
+                
+                // Add physics
+                scene.physics.world.enable(arrow);
+                scene.bullets.add(arrow);
+                
+                // Set properties for collision detection
+                arrow.damage = 3;
+                arrow.isEnemyProjectile = false; // Ensure it's recognized as a player projectile
+                arrow.setData('type', 'arrow'); // Add a type for potential filtering
+                
+                // Set size for better collision detection
+                arrow.body.setSize(16, 4);  // Adjust size to match arrow shape
+                
+                // Set properties
+                arrow.rotation = Math.atan2(dir.y, dir.x);
+                
+                // Set velocity
+                const speed = 500;
+                arrow.body.velocity.x = dir.x * speed;
+                arrow.body.velocity.y = dir.y * speed;
+                
+                // Apply visual effect
+                arrow.setTint(0x00FF00);
+                
+                // Cleanup after 2 seconds
+                scene.time.delayedCall(2000, () => {
+                    if (arrow && arrow.active) {
+                        arrow.destroy();
+                    }
+                });
             });
             
             return true;

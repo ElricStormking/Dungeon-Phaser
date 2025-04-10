@@ -7,10 +7,13 @@ export const TILE_SIZE = 16; // Size of each tile in the game grid
 export const WORLD_WIDTH = GAME_WIDTH * 2;
 export const WORLD_HEIGHT = GAME_HEIGHT * 2;
 
-// Define tile indices (can be moved to constants.js later)
-const MEADOW_TILE = 0;
-const BUSH_TILE = 1;
-const FOREST_TILE = 2;
+// Define tile indices
+export const MEADOW_TILE = 0;
+export const BUSH_TILE = 1;
+export const FOREST_TILE = 2;
+
+// Game settings
+export const FILE_SIZE = 16; // Size of follower entity
 
 // Assume textures 'meadow_tile', 'bush_tile', 'forest_tile' exist and are TILE_SIZE x TILE_SIZE
 // These would ideally be loaded in preload() or generated via createGameTextures
