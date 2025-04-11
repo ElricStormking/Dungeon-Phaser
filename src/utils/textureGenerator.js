@@ -1,50 +1,117 @@
 import { TILE_SIZE } from '../constants.js';
 
-// Create all game textures during preload
+/**
+ * Creates all game textures in one centralized place
+ * This is the single source of truth for texture generation in the game
+ * 
+ * @param {Phaser.Scene} scene - The scene context for texture generation
+ */
 export function createGameTextures(scene) {
     console.log('Creating game textures...');
+
+    // --- Basic Utility Textures ---
+    createWhitePixelTexture(scene);
+    createParticleTexture(scene);
     
-    // Create a pixel texture for particles
+    // --- Character Textures ---
+    createPlayerTexture(scene);
+    createFollowerTexture(scene);
+    
+    // --- Enemy Textures ---
+    createEnemyTexture(scene);
+    
+    // --- Projectile Textures ---
+    createBulletTexture(scene);
+    createArrowTexture(scene);
+    
+    // --- Item Textures ---
+    createPickupTexture(scene);
+    
+    // --- Terrain Textures ---
+    createTerrainTextures(scene);
+    
+    console.log('Game textures created successfully!');
+}
+
+/**
+ * Creates a single white pixel texture for various effects
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createWhitePixelTexture(scene) {
+    const pixelCanvas = document.createElement('canvas');
+    pixelCanvas.width = 1;
+    pixelCanvas.height = 1;
+    const pixelCtx = pixelCanvas.getContext('2d');
+    pixelCtx.fillStyle = '#FFFFFF';
+    pixelCtx.fillRect(0, 0, 1, 1);
+    scene.textures.addCanvas('pixel', pixelCanvas);
+}
+
+/**
+ * Creates a particle texture for various particle effects
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createParticleTexture(scene) {
     const particleCanvas = document.createElement('canvas');
     particleCanvas.width = 4;
     particleCanvas.height = 4;
     const particleCtx = particleCanvas.getContext('2d');
     particleCtx.fillStyle = '#FFFFFF';
     particleCtx.fillRect(0, 0, 4, 4);
-    
-    // Create basic shapes for the game
-    scene.textures.addCanvas('particle', particleCanvas); // Use addCanvas instead of addBase64
-    
-    // Create player texture
+    scene.textures.addCanvas('particle', particleCanvas);
+}
+
+/**
+ * Creates the player character texture
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createPlayerTexture(scene) {
     const playerCanvas = document.createElement('canvas');
     playerCanvas.width = TILE_SIZE;
     playerCanvas.height = TILE_SIZE;
     const playerCtx = playerCanvas.getContext('2d');
+    
+    // Main body (square with eyes)
     playerCtx.fillStyle = '#00FFFF'; // Default color (will be tinted later)
     playerCtx.fillRect(2, 2, TILE_SIZE-4, TILE_SIZE-4);
+    
     // Add eyes
     playerCtx.fillStyle = '#000000';
     playerCtx.fillRect(TILE_SIZE*0.6, TILE_SIZE*0.3, 3, 3);
     playerCtx.fillRect(TILE_SIZE*0.6, TILE_SIZE*0.7, 3, 3);
-    scene.textures.addCanvas('player', playerCanvas);
     
-    // Create follower texture
+    scene.textures.addCanvas('player', playerCanvas);
+}
+
+/**
+ * Creates the follower texture (snake body segments)
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createFollowerTexture(scene) {
     const followerCanvas = document.createElement('canvas');
     followerCanvas.width = TILE_SIZE;
     followerCanvas.height = TILE_SIZE;
     const followerCtx = followerCanvas.getContext('2d');
+    
     // Draw circle
     followerCtx.fillStyle = '#00FFFF'; // Default color (will be tinted later)
     followerCtx.beginPath();
     followerCtx.arc(TILE_SIZE/2, TILE_SIZE/2, TILE_SIZE/2-2, 0, Math.PI*2);
     followerCtx.fill();
-    scene.textures.addCanvas('follower', followerCanvas);
     
-    // Create enemy texture
+    scene.textures.addCanvas('follower', followerCanvas);
+}
+
+/**
+ * Creates the enemy texture with spiky appearance
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createEnemyTexture(scene) {
     const enemyCanvas = document.createElement('canvas');
     enemyCanvas.width = TILE_SIZE;
     enemyCanvas.height = TILE_SIZE;
     const enemyCtx = enemyCanvas.getContext('2d');
+    
     // Draw spiky enemy
     enemyCtx.fillStyle = '#FF0000'; // Default color (will be tinted later)
     enemyCtx.beginPath();
@@ -66,43 +133,163 @@ export function createGameTextures(scene) {
             enemyCtx.lineTo(x, y);
         }
     }
+    
     enemyCtx.closePath();
     enemyCtx.fill();
+    
     scene.textures.addCanvas('enemy', enemyCanvas);
     
-    // Create pickup texture
+    // Also create variations for different enemy types
+    createEnemyVariations(scene);
+}
+
+/**
+ * Creates variations of enemy textures for different enemy types
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createEnemyVariations(scene) {
+    // Dasher Enemy (faster, more streamlined)
+    const dasherCanvas = document.createElement('canvas');
+    dasherCanvas.width = TILE_SIZE;
+    dasherCanvas.height = TILE_SIZE;
+    const dasherCtx = dasherCanvas.getContext('2d');
+    
+    // Streamlined shape for dasher
+    dasherCtx.fillStyle = '#FF8800';
+    dasherCtx.beginPath();
+    dasherCtx.moveTo(TILE_SIZE*0.8, TILE_SIZE/2);
+    dasherCtx.lineTo(TILE_SIZE/2, TILE_SIZE*0.3);
+    dasherCtx.lineTo(TILE_SIZE*0.2, TILE_SIZE/2);
+    dasherCtx.lineTo(TILE_SIZE/2, TILE_SIZE*0.7);
+    dasherCtx.closePath();
+    dasherCtx.fill();
+    
+    scene.textures.addCanvas('enemy_dasher', dasherCanvas);
+    
+    // Bomber Enemy (round with fuse)
+    const bomberCanvas = document.createElement('canvas');
+    bomberCanvas.width = TILE_SIZE;
+    bomberCanvas.height = TILE_SIZE;
+    const bomberCtx = bomberCanvas.getContext('2d');
+    
+    // Round bomb shape
+    bomberCtx.fillStyle = '#FFAA00';
+    bomberCtx.beginPath();
+    bomberCtx.arc(TILE_SIZE/2, TILE_SIZE/2 + 2, TILE_SIZE/2 - 4, 0, Math.PI*2);
+    bomberCtx.fill();
+    
+    // Fuse
+    bomberCtx.strokeStyle = '#FFDD00';
+    bomberCtx.lineWidth = 2;
+    bomberCtx.beginPath();
+    bomberCtx.moveTo(TILE_SIZE/2, TILE_SIZE/2 - 2);
+    bomberCtx.lineTo(TILE_SIZE/2, TILE_SIZE/2 - 6);
+    bomberCtx.stroke();
+    
+    scene.textures.addCanvas('enemy_bomber', bomberCanvas);
+    
+    // Shooter Enemy (with targeting reticle)
+    const shooterCanvas = document.createElement('canvas');
+    shooterCanvas.width = TILE_SIZE;
+    shooterCanvas.height = TILE_SIZE;
+    const shooterCtx = shooterCanvas.getContext('2d');
+    
+    // Base shape
+    shooterCtx.fillStyle = '#00AAFF';
+    shooterCtx.beginPath();
+    shooterCtx.arc(TILE_SIZE/2, TILE_SIZE/2, TILE_SIZE/2 - 3, 0, Math.PI*2);
+    shooterCtx.fill();
+    
+    // Targeting reticle
+    shooterCtx.strokeStyle = '#FFFFFF';
+    shooterCtx.lineWidth = 1;
+    shooterCtx.beginPath();
+    
+    // Horizontal and vertical lines
+    shooterCtx.moveTo(TILE_SIZE/2 - 5, TILE_SIZE/2);
+    shooterCtx.lineTo(TILE_SIZE/2 + 5, TILE_SIZE/2);
+    shooterCtx.moveTo(TILE_SIZE/2, TILE_SIZE/2 - 5);
+    shooterCtx.lineTo(TILE_SIZE/2, TILE_SIZE/2 + 5);
+    
+    shooterCtx.stroke();
+    
+    scene.textures.addCanvas('enemy_shooter', shooterCanvas);
+    
+    // Mage Enemy (with magical glow)
+    const mageCanvas = document.createElement('canvas');
+    mageCanvas.width = TILE_SIZE;
+    mageCanvas.height = TILE_SIZE;
+    const mageCtx = mageCanvas.getContext('2d');
+    
+    // Base shape
+    mageCtx.fillStyle = '#AA00FF';
+    mageCtx.beginPath();
+    mageCtx.arc(TILE_SIZE/2, TILE_SIZE/2, TILE_SIZE/2 - 4, 0, Math.PI*2);
+    mageCtx.fill();
+    
+    // Magical glow (outer ring)
+    mageCtx.strokeStyle = '#DD77FF';
+    mageCtx.lineWidth = 1;
+    mageCtx.beginPath();
+    mageCtx.arc(TILE_SIZE/2, TILE_SIZE/2, TILE_SIZE/2 - 2, 0, Math.PI*2);
+    mageCtx.stroke();
+    
+    scene.textures.addCanvas('enemy_mage', mageCanvas);
+}
+
+/**
+ * Creates the pickup texture (collectible items)
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createPickupTexture(scene) {
     const pickupCanvas = document.createElement('canvas');
     pickupCanvas.width = TILE_SIZE;
     pickupCanvas.height = TILE_SIZE;
     const pickupCtx = pickupCanvas.getContext('2d');
+    
     // Draw shiny circle
     pickupCtx.fillStyle = '#FFFF00';
     pickupCtx.beginPath();
     pickupCtx.arc(TILE_SIZE/2, TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2);
     pickupCtx.fill();
+    
     // Add shine
     pickupCtx.fillStyle = '#FFFFFF';
     pickupCtx.beginPath();
     pickupCtx.arc(TILE_SIZE/3, TILE_SIZE/3, TILE_SIZE/8, 0, Math.PI*2);
     pickupCtx.fill();
-    scene.textures.addCanvas('pickup', pickupCanvas);
     
-    // Create bullet texture
+    scene.textures.addCanvas('pickup', pickupCanvas);
+}
+
+/**
+ * Creates the bullet texture for projectiles
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createBulletTexture(scene) {
     const bulletCanvas = document.createElement('canvas');
     bulletCanvas.width = TILE_SIZE/2;
     bulletCanvas.height = TILE_SIZE/2;
     const bulletCtx = bulletCanvas.getContext('2d');
+    
     bulletCtx.fillStyle = '#FFFF00';
     bulletCtx.beginPath();
     bulletCtx.arc(TILE_SIZE/4, TILE_SIZE/4, TILE_SIZE/4-1, 0, Math.PI*2);
     bulletCtx.fill();
-    scene.textures.addCanvas('bullet', bulletCanvas);
     
-    // Create arrow texture
+    scene.textures.addCanvas('bullet', bulletCanvas);
+}
+
+/**
+ * Creates the arrow texture for archer projectiles
+ * @param {Phaser.Scene} scene - The scene context
+ */
+function createArrowTexture(scene) {
     const arrowCanvas = document.createElement('canvas');
     arrowCanvas.width = TILE_SIZE;
     arrowCanvas.height = TILE_SIZE/2;
     const arrowCtx = arrowCanvas.getContext('2d');
+    
     arrowCtx.strokeStyle = '#00FF00';
     arrowCtx.lineWidth = 2;
     arrowCtx.beginPath();
@@ -112,12 +299,8 @@ export function createGameTextures(scene) {
     arrowCtx.lineTo(TILE_SIZE, TILE_SIZE/4);
     arrowCtx.lineTo(TILE_SIZE*0.7, TILE_SIZE/2);
     arrowCtx.stroke();
+    
     scene.textures.addCanvas('arrow', arrowCanvas);
-    
-    // Create terrain textures
-    createTerrainTextures(scene);
-    
-    console.log('Game textures created successfully!');
 }
 
 /**
@@ -125,8 +308,6 @@ export function createGameTextures(scene) {
  * @param {Phaser.Scene} scene - The scene to add textures to
  */
 function createTerrainTextures(scene) {
-    const TILE_SIZE = 16; // Match the tile size in constants.js
-    
     // Create texture for meadow (75% dark grey floor, 25% grass)
     const meadowCanvas = document.createElement('canvas');
     meadowCanvas.width = TILE_SIZE;
@@ -222,9 +403,11 @@ function createTerrainTextures(scene) {
     const forestCtx = forestCanvas.getContext('2d');
     forestCtx.fillStyle = '#228B22'; // Forest green background
     forestCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    
     // Draw tree trunk
     forestCtx.fillStyle = '#8B4513'; // Brown
     forestCtx.fillRect(TILE_SIZE / 2 - 2, TILE_SIZE / 2, 4, TILE_SIZE / 2);
+    
     // Draw tree top
     forestCtx.fillStyle = '#006400'; // Dark green
     forestCtx.beginPath();
@@ -237,6 +420,7 @@ function createTerrainTextures(scene) {
     forestCtx.lineTo(3 * TILE_SIZE / 4 - 2, TILE_SIZE / 2 - 3);
     forestCtx.lineTo(TILE_SIZE / 2, TILE_SIZE / 6 - 5);
     forestCtx.fill();
+    
     scene.textures.addCanvas('forest_tile', forestCanvas);
     
     // Create texture for swamp
@@ -264,6 +448,7 @@ function createTerrainTextures(scene) {
         const height = 2 + Math.random() * 3;
         swampCtx.fillRect(x, y, 1, height);
     }
+    
     scene.textures.addCanvas('swamp_tile', swampCanvas);
     
     // Create texture for floor (pure black)

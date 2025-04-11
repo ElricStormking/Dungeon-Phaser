@@ -8,12 +8,13 @@ import Projectile from './Projectile.js';
  */
 export default class Player extends Character {
     constructor(scene, x, y, heroClass) {
-        super(scene, x, y, 'player', {
+        // Use the warrior sprite sheet instead of the default 'player' texture
+        super(scene, x, y, 'warrior', {
             health: 50,
             maxHealth: 50,
             direction: 'right',
-            tint: heroClass.color,
-            bodySize: { width: TILE_SIZE * 0.8, height: TILE_SIZE * 0.8 }
+            tint: 0xFFFFFF, // No tint needed for sprite sheet
+            bodySize: { width: 36, height: 36 } // Larger hitbox for bigger sprite
         });
         
         // Hero class and abilities
@@ -27,6 +28,62 @@ export default class Player extends Character {
         
         // Set depth and other properties
         this.setDepth(10);
+        
+        // Scale the sprite to match the game's TILE_SIZE
+        // With TILE_SIZE=48 and sprite size=32, we scale up by 1.5
+        this.setScale(1.5);
+        
+        // Set the sprite's origin to center for better positioning
+        this.setOrigin(0.5, 0.5);
+        
+        // Create animations if they don't exist yet
+        this.createAnimations();
+        
+        // Start with default animation
+        this.play('warrior-down-idle');
+    }
+    
+    /**
+     * Create player animations from the sprite sheet
+     */
+    createAnimations() {
+        const scene = this.scene;
+        const anims = scene.anims;
+        
+        // Only create animations once
+        if (!anims.exists('warrior-down-idle')) {
+            // Down-facing animations (first row - frames 0-3)
+            anims.create({
+                key: 'warrior-down-idle',
+                frames: anims.generateFrameNumbers('warrior', { start: 0, end: 3 }),
+                frameRate: 5,
+                repeat: -1
+            });
+            
+            // Side-facing animations (second row - frames 4-7)
+            anims.create({
+                key: 'warrior-side-idle',
+                frames: anims.generateFrameNumbers('warrior', { start: 4, end: 7 }),
+                frameRate: 5,
+                repeat: -1
+            });
+            
+            // Up-facing animations (third row - frames 8-11)
+            anims.create({
+                key: 'warrior-up-idle',
+                frames: anims.generateFrameNumbers('warrior', { start: 8, end: 11 }),
+                frameRate: 5,
+                repeat: -1
+            });
+            
+            // Back-facing animations (fourth row - frames 12-15)
+            anims.create({
+                key: 'warrior-back-idle',
+                frames: anims.generateFrameNumbers('warrior', { start: 12, end: 15 }),
+                frameRate: 5,
+                repeat: -1
+            });
+        }
     }
     
     /**
@@ -450,18 +507,41 @@ export default class Player extends Character {
     }
     
     /**
-     * Update cooldowns and other time-based properties
+     * Update method called every frame
+     * @param {number} time - Current time
+     * @param {number} delta - Time since last update
      */
     update(time, delta) {
-        super.update(time, delta);
-        
-        // Update cooldowns
+        // Update cooldown timers
         if (this.specialAttackCooldown > 0) {
             this.specialAttackCooldown = Math.max(0, this.specialAttackCooldown - delta);
         }
         
         if (this.basicAttackCooldownTimer > 0) {
             this.basicAttackCooldownTimer = Math.max(0, this.basicAttackCooldownTimer - delta);
+        }
+        
+        // Update animation based on movement direction
+        // For this warrior sprite, we use the direction property directly
+        // rather than body velocity since the grid movement doesn't use physics velocity
+        
+        if (this.direction) {
+            switch (this.direction) {
+                case 'up':
+                    this.play('warrior-up-idle', true);
+                    break;
+                case 'down':
+                    this.play('warrior-down-idle', true);
+                    break;
+                case 'left':
+                    this.setFlipX(true);
+                    this.play('warrior-side-idle', true);
+                    break;
+                case 'right':
+                    this.setFlipX(false);
+                    this.play('warrior-side-idle', true);
+                    break;
+            }
         }
     }
 } 

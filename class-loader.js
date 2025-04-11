@@ -1,3 +1,5 @@
+import { TILE_SIZE } from './src/constants.js';
+
 class ClassLoader {
     constructor(scene) {
         this.scene = scene;
@@ -215,8 +217,6 @@ class ClassLoader {
     }
 
     addSpecialAttackFunction(classData) {
-        const TILE_SIZE = 16; // Make sure this matches your game's tile size
-        
         // Default empty function
         classData.specialAttack = () => false;
         

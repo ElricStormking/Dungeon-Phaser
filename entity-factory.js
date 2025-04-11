@@ -9,9 +9,11 @@ import {
     CombatComponent,
     AIComponent,
     SpecialAbilityComponent,
-    ExperienceComponent,
-    TILE_SIZE
+    ExperienceComponent
 } from './ecs.js';
+
+import { TILE_SIZE } from './src/constants.js';
+import Player from './src/entities/Player.js';
 
 // Factory for creating game entities
 class EntityFactory {
@@ -22,36 +24,39 @@ class EntityFactory {
 
     // Create player entity
     createPlayer(x, y, heroClass) {
-        const entity = this.entityManager.createEntity();
+        // Create player using the dedicated Player class
+        // This is the primary source of truth for player creation
+        const player = new Player(this.scene, x, y, heroClass);
         
-        // Create sprite
-        const sprite = this.scene.physics.add.sprite(x, y, 'player');
-        sprite.setTint(heroClass.color);
+        // If using ECS, you could also create an entity wrapper
+        if (this.entityManager) {
+            const entity = this.entityManager.createEntity();
+            
+            // Add components
+            entity.addComponent(new PositionComponent(x, y));
+            entity.addComponent(new SpriteComponent(player));
+            entity.addComponent(new HealthComponent(player.health, player.maxHealth));
+            entity.addComponent(new MovementComponent(player.speed, player.direction));
+            entity.addComponent(new CombatComponent(1, 500));
+            
+            // Add special ability based on hero class
+            entity.addComponent(new SpecialAbilityComponent(
+                heroClass.specialAttack,
+                3000
+            ));
+            
+            // Add experience component for leveling
+            entity.addComponent(new ExperienceComponent());
+            
+            // Add player tag
+            entity.addTag('player');
+            
+            // Store the entity reference on the player for ECS operations
+            player.entityId = entity.id;
+        }
         
-        // Add components
-        entity.addComponent(new PositionComponent(x, y));
-        entity.addComponent(new SpriteComponent(sprite));
-        entity.addComponent(new HealthComponent(50, 50)); // Player starts with 50 health
-        entity.addComponent(new MovementComponent(1, 'right')); // Basic movement speed
-        entity.addComponent(new CombatComponent(1, 500)); // Basic attack stats
-        
-        // Add special ability based on hero class
-        entity.addComponent(new SpecialAbilityComponent(
-            heroClass.specialAttack,
-            3000 // Cooldown in ms
-        ));
-        
-        // Add experience component for leveling
-        entity.addComponent(new ExperienceComponent());
-        
-        // Add player tag
-        entity.addTag('player');
-        
-        // Create health bar
-        const healthComponent = entity.getComponent(HealthComponent);
-        healthComponent.healthBar = this.scene.add.graphics();
-        
-        return entity;
+        // Return the player instance
+        return player;
     }
     
     // Create follower entity

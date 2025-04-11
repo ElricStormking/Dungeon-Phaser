@@ -1,4 +1,4 @@
-import { GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, UI_PADDING } from '../constants.js';
 
 /**
  * Manages all UI elements in the game
@@ -12,6 +12,7 @@ export default class UIManager {
         this.heroText = null;
         this.specialCooldownBar = null;
         this.cooldownText = null;
+        this.uiBackground = null;
         
         // Initialize UI
         this.createUI();
@@ -21,32 +22,72 @@ export default class UIManager {
      * Create all UI elements
      */
     createUI() {
-        const style = { fontSize: '18px', fontFamily: 'Arial', fill: '#fff' };
-        const depth = 10;
+        const style = { 
+            fontSize: '24px', 
+            fontFamily: 'Arial', 
+            fill: '#fff',
+            stroke: '#000',
+            strokeThickness: 4
+        };
+        const depth = 100;
         
-        // Score Text
-        this.scoreText = this.scene.add.text(16, 50, 'Score: 0', style)
-            .setDepth(depth)
-            .setScrollFactor(0); // Fixed to camera
+        // Create semi-transparent UI panel background at the top
+        this.uiBackground = this.scene.add.rectangle(
+            GAME_WIDTH / 2,
+            40,
+            GAME_WIDTH,
+            80,
+            0x000000,
+            0.7
+        )
+            .setScrollFactor(0)
+            .setDepth(depth - 1);
+            
+        // Add a border to the UI background
+        this.scene.add.rectangle(
+            GAME_WIDTH / 2,
+            40,
+            GAME_WIDTH,
+            80,
+            0x333333,
+            1
+        )
+            .setScrollFactor(0)
+            .setDepth(depth - 1)
+            .setStrokeStyle(2, 0x666666);
         
-        // Hero Text
-        this.heroText = this.scene.add.text(
-            16, 
-            78, 
-            `Hero: ${this.scene.player.heroClass.name}`, 
+        // Score Text - positioned at top-right
+        this.scoreText = this.scene.add.text(
+            GAME_WIDTH - UI_PADDING - 20, 
+            UI_PADDING + 10, 
+            'Score: 0', 
             style
-        ).setDepth(depth).setScrollFactor(0);
+        )
+            .setDepth(depth)
+            .setScrollFactor(0) // Fixed to camera
+            .setOrigin(1, 0); // Right-aligned
+        
+        // Hero Text - positioned at top-left
+        this.heroText = this.scene.add.text(
+            UI_PADDING + 20, 
+            UI_PADDING + 10, 
+            `${this.scene.player.heroClass.name}`, 
+            style
+        )
+            .setDepth(depth)
+            .setScrollFactor(0)
+            .setOrigin(0, 0); // Left-aligned
         
         // Special Cooldown Bar & Text
-        const cdX = GAME_WIDTH - 110;
-        const cdY = 30;
+        const cdX = UI_PADDING + 20;
+        const cdY = UI_PADDING + 50;
         
         // Background
         this.scene.add.rectangle(
             cdX + 50, 
-            cdY + 6, 
+            cdY, 
             100, 
-            12, 
+            16, 
             0x550000
         ).setDepth(depth).setScrollFactor(0);
         
@@ -55,19 +96,19 @@ export default class UIManager {
             cdX, 
             cdY, 
             0, 
-            12, 
+            16, 
             0xff0000
-        ).setOrigin(0, 0)
+        ).setOrigin(0, 0.5)
          .setDepth(depth + 1)
          .setScrollFactor(0);
         
         // Cooldown text
         this.cooldownText = this.scene.add.text(
-            cdX + 50, 
-            cdY + 25, 
+            cdX + 130, 
+            cdY, 
             'READY', 
-            { fontSize: '16px', fontFamily: 'Arial', fill: '#fff' }
-        ).setOrigin(0.5)
+            { fontSize: '18px', fontFamily: 'Arial', fill: '#00ff00', stroke: '#000', strokeThickness: 2 }
+        ).setOrigin(0, 0.5)
          .setDepth(depth + 1)
          .setScrollFactor(0);
         

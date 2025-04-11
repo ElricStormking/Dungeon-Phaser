@@ -1,4 +1,4 @@
-import { GAME_WIDTH, GAME_HEIGHT } from '../constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, UI_PADDING } from '../constants.js';
 
 /**
  * Handles player progression, experience, and level-ups
@@ -22,38 +22,47 @@ export default class LevelSystem {
      */
     createUI() {
         const style = { 
-            fontSize: '18px', 
+            fontSize: '20px', 
             fontFamily: 'Arial', 
             fill: '#fff',
             stroke: '#000000',
             strokeThickness: 3
         };
-        const depth = 100; // Match the UI depth from GameScene
+        const depth = 101; // Slightly higher than UI background
         
-        // Level Text - positioned at top left, similar to other UI elements
-        this.levelText = this.scene.add.text(16, 16, 'Level: 1', style)
+        // Level Text - center of UI bar
+        this.levelText = this.scene.add.text(
+            GAME_WIDTH / 2, 
+            UI_PADDING + 10, 
+            'Level: 1', 
+            style
+        )
+            .setOrigin(0.5, 0)
             .setDepth(depth)
             .setScrollFactor(0); // Fixed to camera
         
-        // Experience Bar Background
+        // Experience Bar Background - below the UI panel
         this.scene.add.rectangle(
             GAME_WIDTH / 2, 
-            10, // At very top of screen
+            80, 
             GAME_WIDTH - 40, 
             12, 
             0x333333
-        ).setDepth(depth).setScrollFactor(0);
+        )
+            .setDepth(depth)
+            .setScrollFactor(0);
         
         // Experience Bar Fill
         this.experienceBar = this.scene.add.rectangle(
-            20, // Position at left edge of background bar
-            10, // At very top of screen
+            20, 
+            80, 
             0, 
             8, 
             0x00ff00
-        ).setOrigin(0, 0.5) // Change origin to left center
-         .setDepth(depth + 1)
-         .setScrollFactor(0); // Fixed to camera
+        )
+            .setOrigin(0, 0.5) 
+            .setDepth(depth + 1)
+            .setScrollFactor(0);
     }
     
     /**

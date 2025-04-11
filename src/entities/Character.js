@@ -219,8 +219,11 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
         
         const barWidth = TILE_SIZE * 0.8;
         const barHeight = 3;
+        
+        // Position the health bar above the character, adjusted for warrior sprite
+        const yOffset = this.texture.key === 'warrior' ? TILE_SIZE * 0.7 : TILE_SIZE * 0.5;
         const barX = this.x - barWidth / 2;
-        const barY = this.y - TILE_SIZE / 2 - barHeight - 1;
+        const barY = this.y - yOffset - barHeight - 1;
         const healthRatio = Math.max(0, this.health / this.maxHealth);
         
         // Background
@@ -257,13 +260,20 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
     }
     
     /**
-     * Update called by the physics group
+     * Update method called every frame
+     * @param {number} time - Current time
+     * @param {number} delta - Time since last update
      */
     update(time, delta) {
-        // Can be overridden by subclasses
-        // This keeps the health bar following the character
-        if (this.active && this.healthBar) {
-            this.updateHealthBar();
+        // Update health bar position to follow character
+        if (this.healthBar) {
+            this.healthBar.x = this.x;
+            this.healthBar.y = this.y - this.height * 0.7;
+        }
+        
+        // Don't automatically update angle for sprite sheet animations
+        if (this.texture.key !== 'warrior') {
+            this.setAngleFromDirection();
         }
     }
 } 

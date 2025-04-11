@@ -3,30 +3,43 @@
 
 import TitleScene from './title-scene.js';
 import GameScene from './game-scene.js';
+import { TILE_SIZE } from './src/constants.js';
 
 // Log when modules are loaded for debugging
 console.log('main.js loaded');
 console.log('TitleScene imported:', !!TitleScene);
 console.log('GameScene imported:', !!GameScene);
 
-// Define TILE_SIZE here as well in case other modules need it
-const TILE_SIZE = 16;
-
-// Game configuration
+// Phaser configuration for Snake Survivors
 const config = {
     type: Phaser.AUTO,
     width: 800,
     height: 600,
     parent: 'game-container',
-    backgroundColor: '#222222',
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { x: 0, y: 0 },
+            gravity: { y: 0 },
             debug: false
         }
     },
-    scene: [TitleScene, GameScene]
+    scene: [
+        // Start with the title scene
+        () => import('./src/scenes/TitleScene.js').then(m => new m.default()),
+        () => import('./src/scenes/GameScene.js').then(m => new m.default()),
+        () => import('./src/scenes/OptionsScene.js').then(m => new m.default())
+    ],
+    pixelArt: true, // Enable pixel art mode (no smoothing)
+    roundPixels: true, // Prevent pixel bleeding
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    // Set paths for loading assets
+    loader: {
+        baseURL: './',
+        path: ''
+    }
 };
 
 // Create game instance when the document is loaded
@@ -85,5 +98,5 @@ function showErrorMessage(message, source, lineno) {
     }
 }
 
-// Export the game config and TILE_SIZE constant
-export { config, TILE_SIZE }; 
+// Export the game config
+export { config }; 

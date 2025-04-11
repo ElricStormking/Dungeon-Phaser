@@ -1,4 +1,4 @@
-import { GAME_WIDTH, GAME_HEIGHT, TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT } from '../constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT, UI_PADDING } from '../constants.js';
 import { createGameTextures } from '../utils/textureGenerator.js';
 import * as Helpers from '../utils/helpers.js';
 import { heroClasses } from '../data/heroClasses.js';
@@ -7,6 +7,7 @@ import { engineerClasses } from '../data/engineerClasses.js';
 // Import our new modular systems
 import Player from '../entities/Player.js';
 import FollowerFactory from '../entities/FollowerFactory.js';
+import EntityFactory from '../entities/EntityFactory.js';
 import MovementSystem from '../systems/MovementSystem.js';
 import SpawnSystem from '../systems/SpawnSystem.js';
 import CombatSystem from '../systems/CombatSystem.js';
@@ -49,6 +50,7 @@ export default class GameScene extends Phaser.Scene {
         this.followerFactory = null;
         this.terrainSystem = null; // New terrain system
         this.audioManager = null; // New audio system
+        this.entityFactory = null;
     }
     
     /**
@@ -86,6 +88,14 @@ export default class GameScene extends Phaser.Scene {
         // Textures are already created in TitleScene preload
         // If running GameScene directly, uncomment the line below:
         // createGameTextures(this);
+        
+        // Load warrior sprite sheet with correct dimensions
+        this.load.spritesheet('warrior', 'assets/warrior.png', { 
+            frameWidth: 32, 
+            frameHeight: 32,
+            spacing: 0,
+            margin: 0
+        });
         
         // Initialize audio manager and load audio assets
         this.audioManager = new AudioManager(this);
@@ -215,9 +225,17 @@ export default class GameScene extends Phaser.Scene {
         const startX = Math.floor(WORLD_WIDTH / 2 / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
         const startY = Math.floor(WORLD_HEIGHT / 2 / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
         
-        // Create player using our Player class
-        this.player = new Player(this, startX, startY, heroClass);
+        // Delegate to entity factory instead of directly creating Player
+        if (!this.entityFactory) {
+            // Create entity factory if not already available
+            this.entityFactory = new EntityFactory(this);
+        }
+        
+        // Use factory to create player
+        this.player = this.entityFactory.createPlayer(startX, startY, heroClass);
         console.log('Player created at:', this.player.x, this.player.y);
+        
+        return this.player;
     }
 
     /**
@@ -229,8 +247,8 @@ export default class GameScene extends Phaser.Scene {
         // Set camera bounds to match the world size
         camera.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-        // Set a moderate zoom level that shows enough of the game world
-        camera.setZoom(1.2); // Reduced from 1.5 to show more of the world
+        // Reduced zoom to show more of the game world with larger tiles
+        camera.setZoom(0.6);
         
         // Enable camera follow with smoother lerp values
         camera.startFollow(this.player, true, 0.08, 0.08);
@@ -241,10 +259,10 @@ export default class GameScene extends Phaser.Scene {
         // Add camera fade-in effect on start
         camera.fadeIn(1000, 0, 0, 0);
         
-        // Create a UI camera that doesn't move or zoom (for UI elements)
-        // Ensure all UI elements have setScrollFactor(0) to make them stay fixed
+        // Ensure UI stays fixed by confirming all UI elements have setScrollFactor(0)
+        // This makes UI elements stay in position even as the camera moves
         
-        console.log('Camera setup with zoom level 1.2 and following player');
+        console.log('Camera setup with zoom level 0.6 and following player');
     }
     
     /**
@@ -291,13 +309,13 @@ export default class GameScene extends Phaser.Scene {
         // Create combat system
         this.combatSystem = new CombatSystem(this);
         
-        // Create level system
+        // Create UI manager first so the background is created
+        this.uiManager = new UIManager(this);
+        
+        // Create level system after UI manager (to appear on top of the UI background)
         this.levelSystem = new LevelSystem(this);
         this.levelSystem.createUI();
         this.currentLevel = this.levelSystem.currentLevel; // Sync current level
-        
-        // Create UI manager
-        this.uiManager = new UIManager(this);
         
         // Audio manager is initialized in preload
     }
@@ -332,16 +350,22 @@ export default class GameScene extends Phaser.Scene {
         .setDepth(uiDepth)
         .setVisible(false);
         
-        // Health display
-        this.healthText = this.add.text(16, 106, 'Health: 0/0', {
-            fontSize: '18px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 3
-        })
+        // Health display - positioned in the right side of the UI bar
+        this.healthText = this.add.text(
+            GAME_WIDTH - UI_PADDING - 20, 
+            UI_PADDING + 50, 
+            'Health: 0/0', 
+            {
+                fontSize: '20px',
+                fontFamily: 'Arial',
+                color: '#00ff00',
+                stroke: '#000000',
+                strokeThickness: 3
+            }
+        )
         .setScrollFactor(0)
-        .setDepth(uiDepth);
+        .setDepth(uiDepth)
+        .setOrigin(1, 0.5); // Right-aligned, vertically centered
         
         // Update health display initially
         this.updateHealthDisplay();

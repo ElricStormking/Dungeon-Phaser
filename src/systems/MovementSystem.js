@@ -153,9 +153,13 @@ export default class MovementSystem {
         player.x = Phaser.Math.Clamp(player.x, halfTile, WORLD_WIDTH - halfTile);
         player.y = Phaser.Math.Clamp(player.y, halfTile, WORLD_HEIGHT - halfTile);
         
-        // Update player's direction property and angle
+        // Update player's direction property
         player.direction = this.direction;
-        player.setAngleFromDirection();
+        
+        // Only set angle for non-warrior sprites (warrior uses animations)
+        if (player.texture.key !== 'warrior') {
+            player.setAngleFromDirection();
+        }
         
         // Move followers using the validated array
         for (let i = 0; i < this.scene.followers.length; i++) {

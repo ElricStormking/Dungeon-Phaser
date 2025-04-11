@@ -4,11 +4,7 @@ import EntityFactory from './entity-factory.js';
 import CollisionSystem from './collision-system.js';
 import { MovementSystem, HealthSystem, AISystem } from './ecs.js';
 import ClassLoader from './class-loader.js';
-
-// Game constants
-const GAME_WIDTH = 800;
-const GAME_HEIGHT = 600;
-const TILE_SIZE = 16;
+import { GAME_WIDTH, GAME_HEIGHT, TILE_SIZE } from './src/constants.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
