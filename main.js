@@ -1,9 +1,9 @@
 // Main entry point for Snake Survivors
 // Sets up the Phaser game instance and registers scenes
 
-import TitleScene from './title-scene.js';
-import GameScene from './game-scene.js';
-import { TILE_SIZE } from './src/constants.js';
+import TitleScene from '/src/scenes/TitleScene.js';
+import GameScene from '/src/scenes/GameScene.js';
+import { TILE_SIZE } from '/src/constants.js';
 
 // Log when modules are loaded for debugging
 console.log('main.js loaded');
@@ -13,8 +13,8 @@ console.log('GameScene imported:', !!GameScene);
 // Phaser configuration for Snake Survivors
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
+    width: 1920,
+    height: 1080,
     parent: 'game-container',
     physics: {
         default: 'arcade',
@@ -25,19 +25,20 @@ const config = {
     },
     scene: [
         // Start with the title scene
-        () => import('./src/scenes/TitleScene.js').then(m => new m.default()),
-        () => import('./src/scenes/GameScene.js').then(m => new m.default()),
-        () => import('./src/scenes/OptionsScene.js').then(m => new m.default())
+        TitleScene,
+        GameScene
     ],
     pixelArt: true, // Enable pixel art mode (no smoothing)
     roundPixels: true, // Prevent pixel bleeding
     scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 1920,
+        height: 1080
     },
     // Set paths for loading assets
     loader: {
-        baseURL: './',
+        baseURL: '/',
         path: ''
     }
 };

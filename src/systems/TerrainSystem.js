@@ -1,4 +1,4 @@
-import { TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT } from '../constants.js';
+import { TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT, GRID_COLS, GRID_ROWS } from '../constants.js';
 import { createGameTextures } from '../utils/textureGenerator.js';
 
 // Define terrain types and their IDs
@@ -7,7 +7,8 @@ export const TERRAIN = {
     BUSH: 1,
     FOREST: 2,
     SWAMP: 3,
-    FLOOR: 4
+    FLOOR: 4,
+    BORDER: 5
 };
 
 /**
@@ -28,7 +29,8 @@ export default class TerrainSystem {
             [TERRAIN.BUSH]: { name: 'Bush', slowFactor: 0.75, damage: 0 },
             [TERRAIN.FOREST]: { name: 'Forest', slowFactor: 0.5, damage: 0 },
             [TERRAIN.SWAMP]: { name: 'Swamp', slowFactor: 0.9, damage: 1 },
-            [TERRAIN.FLOOR]: { name: 'Floor', slowFactor: 1.0, damage: 0 }
+            [TERRAIN.FLOOR]: { name: 'Floor', slowFactor: 1.0, damage: 0 },
+            [TERRAIN.BORDER]: { name: 'Border', slowFactor: 0.5, damage: 2 }
         };
     }
     
@@ -36,55 +38,301 @@ export default class TerrainSystem {
      * Create and initialize the terrain
      */
     createTerrain() {
-        // Generate the terrain data based on the current level
-        this.generateTerrainData();
+        // Create a new tilemap with the correct dimensions
+        this.terrainMap = this.scene.make.tilemap({
+            tileWidth: TILE_SIZE,
+            tileHeight: TILE_SIZE,
+            width: GRID_COLS,
+            height: GRID_ROWS
+        });
+
+        // Create terrain textures if they don't exist
+        if (!this.scene.textures.exists('terrain')) {
+            createGameTextures(this.scene);
+        }
+
+        // Add tileset using the generated texture
+        this.terrainTileset = this.terrainMap.addTilesetImage('terrain', 'terrain', TILE_SIZE, TILE_SIZE, 0, 0);
         
-        // Create tilemap from the terrain data
-        this.createTilemap();
+        // Create the base terrain layer with alpha support
+        this.terrainLayer = this.terrainMap.createBlankLayer('terrain', this.terrainTileset, 0, 0);
+        this.terrainLayer.setDepth(-1); // Make sure terrain is behind everything
+        this.terrainLayer.setAlpha(1); // Enable alpha for the layer
+        
+        // Set the layer size to match the world size
+        this.terrainLayer.width = WORLD_WIDTH;
+        this.terrainLayer.height = WORLD_HEIGHT;
+        
+        // First, generate the main terrain
+        this.generateTerrain();
+        
+        // Then add border walls on top of the terrain
+        this.createBorderWalls();
+        
+        // Set collision properties for swamp and border tiles
+        this.terrainLayer.setCollisionByProperty({ index: [TERRAIN.SWAMP, TERRAIN.BORDER] });
+        
+        // Add collision for player
+        if (this.scene.player) {
+            this.setupTerrainCollisions();
+        }
+        
+        console.log('Terrain created with tileset:', this.terrainTileset);
+    }
+    
+    /**
+     * Create border walls around the map edges
+     */
+    createBorderWalls() {
+        // Add border on the outer edge of the map
+        const borderWidth = 2; // Width of the border in tiles
+        
+        // Top border
+        for (let x = 0; x < GRID_COLS; x++) {
+            for (let y = 0; y < borderWidth; y++) {
+                this.terrainLayer.putTileAt(TERRAIN.BORDER, x, y);
+            }
+        }
+        
+        // Bottom border
+        for (let x = 0; x < GRID_COLS; x++) {
+            for (let y = GRID_ROWS - borderWidth; y < GRID_ROWS; y++) {
+                this.terrainLayer.putTileAt(TERRAIN.BORDER, x, y);
+            }
+        }
+        
+        // Left border
+        for (let y = 0; y < GRID_ROWS; y++) {
+            for (let x = 0; x < borderWidth; x++) {
+                this.terrainLayer.putTileAt(TERRAIN.BORDER, x, y);
+            }
+        }
+        
+        // Right border
+        for (let y = 0; y < GRID_ROWS; y++) {
+            for (let x = GRID_COLS - borderWidth; x < GRID_COLS; x++) {
+                this.terrainLayer.putTileAt(TERRAIN.BORDER, x, y);
+            }
+        }
+        
+        console.log('Border walls created around the map');
+    }
+    
+    /**
+     * Setup collisions between player and terrain
+     */
+    setupTerrainCollisions() {
+        if (this.terrainCollider) {
+            this.terrainCollider.destroy();
+        }
+        
+        this.terrainCollider = this.scene.physics.add.collider(
+            this.scene.player,
+            this.terrainLayer,
+            this.handleTerrainCollision,
+            null,
+            this
+        );
+        
+        console.log('Terrain collisions set up for player');
+    }
+    
+    /**
+     * Handle collision with terrain
+     * @param {Phaser.GameObjects.GameObject} player - The player object
+     * @param {Phaser.Tilemaps.Tile} tile - The tile that was collided with
+     */
+    handleTerrainCollision(player, tile) {
+        if (!tile || !player) return;
+        
+        if (tile.index === TERRAIN.SWAMP || tile.index === TERRAIN.BORDER) {
+            // Apply damage to player when in swamp water or hitting border
+            const terrainType = tile.index === TERRAIN.SWAMP ? TERRAIN.SWAMP : TERRAIN.BORDER;
+            const damage = this.effects[terrainType].damage;
+            
+            if (damage > 0 && player.damage) {
+                // Apply damage with a cooldown
+                const currentTime = Date.now();
+                if (!player.lastTerrainDamageTime || currentTime - player.lastTerrainDamageTime > 500) {
+                    player.damage(damage);
+                    player.lastTerrainDamageTime = currentTime;
+                    
+                    // Visual feedback for damage - different color based on terrain type
+                    const flashColor = tile.index === TERRAIN.BORDER ? 0xFF0000 : 0x2F4F4F;
+                    
+                    this.scene.tweens.add({
+                        targets: player,
+                        alpha: 0.5,
+                        duration: 100,
+                        yoyo: true
+                    });
+                    
+                    // Camera flash for border collision
+                    if (tile.index === TERRAIN.BORDER) {
+                        this.scene.cameras.main.flash(100, 255, 0, 0, 0.3);
+                    }
+                    
+                    console.log(`Applied ${damage} damage from ${this.effects[terrainType].name} terrain`);
+                }
+            }
+        }
     }
     
     /**
      * Generate terrain data based on current level
      */
-    generateTerrainData() {
-        const mapWidthInTiles = Math.ceil(WORLD_WIDTH / TILE_SIZE);
-        const mapHeightInTiles = Math.ceil(WORLD_HEIGHT / TILE_SIZE);
+    generateTerrain() {
+        const noise = new Perlin();
+        const scale = 0.05; // Adjust this to change the size of terrain features
         
-        // Initialize map with floor terrain (pure black)
-        const mapData = Array(mapHeightInTiles).fill().map(() => 
-            Array(mapWidthInTiles).fill(TERRAIN.FLOOR)
-        );
-        
-        // Use the current level to influence terrain generation
-        const level = this.scene.currentLevel || 1;
-        const stage = Math.ceil(level / 8);
-        
-        // Generate meadow clusters covering approximately 20% of the map
-        this.generateMeadowClusters(mapData, mapWidthInTiles, mapHeightInTiles, stage);
-        
-        // Generate forest clusters
-        this.generateForestClusters(mapData, mapWidthInTiles, mapHeightInTiles, stage);
-        
-        // Generate bushes - some near forests and some clustered in different areas
-        this.generateBushes(mapData, mapWidthInTiles, mapHeightInTiles, stage);
-        
-        // Generate swamps
-        this.generateSwamps(mapData, mapWidthInTiles, mapHeightInTiles, stage);
-        
-        // Always ensure the player spawn area is clear (meadow)
-        const centerX = Math.floor(mapWidthInTiles / 2);
-        const centerY = Math.floor(mapHeightInTiles / 2);
-        
-        // Clear a 5x5 area around the center for player spawn
-        for (let y = centerY - 2; y <= centerY + 2; y++) {
-            for (let x = centerX - 2; x <= centerX + 2; x++) {
-                if (y >= 0 && y < mapHeightInTiles && x >= 0 && x < mapWidthInTiles) {
-                    mapData[y][x] = TERRAIN.MEADOW;
+        // First fill the entire map with floor tiles
+        for (let y = 0; y < GRID_ROWS; y++) {
+            for (let x = 0; x < GRID_COLS; x++) {
+                const tile = this.terrainLayer.putTileAt(TERRAIN.FLOOR, x, y);
+                if (tile) {
+                    const effect = this.effects[TERRAIN.FLOOR];
+                    tile.properties = {
+                        name: effect.name,
+                        slowFactor: effect.slowFactor,
+                        damage: effect.damage
+                    };
                 }
             }
         }
         
-        this.terrainData = mapData;
+        console.log('Initial floor tiles created for the entire map');
+        
+        // Now create clusters of other terrain types (total covering ~5% of the map)
+        // Create an array to track which cells we've already processed
+        const processed = Array(GRID_ROWS).fill().map(() => Array(GRID_COLS).fill(false));
+        
+        // Create clusters for each terrain type
+        this.createTerrainClusters(TERRAIN.FOREST, 3, 8, 15, processed, noise);
+        this.createTerrainClusters(TERRAIN.BUSH, 4, 6, 12, processed, noise);
+        this.createTerrainClusters(TERRAIN.SWAMP, 2, 5, 10, processed, noise);
+        this.createTerrainClusters(TERRAIN.MEADOW, 3, 7, 12, processed, noise);
+        
+        console.log('Terrain generated with ~95% floor tiles and clustered terrain types');
+    }
+    
+    /**
+     * Create clusters of a specific terrain type
+     * @param {number} terrainType - The terrain type to create
+     * @param {number} numClusters - Number of clusters to create
+     * @param {number} minSize - Minimum cluster size
+     * @param {number} maxSize - Maximum cluster size
+     * @param {Array} processed - 2D array tracking processed cells
+     * @param {Perlin} noise - Perlin noise generator for randomization
+     */
+    createTerrainClusters(terrainType, numClusters, minSize, maxSize, processed, noise) {
+        const terrainName = this.effects[terrainType].name;
+        
+        for (let i = 0; i < numClusters; i++) {
+            // Find a random unprocessed location for the cluster
+            let startX, startY;
+            let attempts = 0;
+            const maxAttempts = 50;
+            
+            do {
+                startX = Phaser.Math.Between(5, GRID_COLS - 5);
+                startY = Phaser.Math.Between(5, GRID_ROWS - 5);
+                attempts++;
+                
+                // Break if we can't find a valid spot after many attempts
+                if (attempts > maxAttempts) break;
+            } while (processed[startY][startX]);
+            
+            if (attempts > maxAttempts) continue;
+            
+            // Mark this position as processed
+            processed[startY][startX] = true;
+            
+            // Determine cluster size
+            const clusterSize = Phaser.Math.Between(minSize, maxSize);
+            
+            // Create the cluster using a flood fill approach with randomization
+            this.createCluster(startX, startY, terrainType, clusterSize, processed, noise);
+        }
+        
+        console.log(`Created ${numClusters} clusters of ${terrainName}`);
+    }
+    
+    /**
+     * Create a single cluster using a modified flood fill algorithm
+     * @param {number} startX - Starting X position
+     * @param {number} startY - Starting Y position 
+     * @param {number} terrainType - Type of terrain to place
+     * @param {number} size - Size of the cluster
+     * @param {Array} processed - Tracking array for processed cells
+     * @param {Perlin} noise - Noise generator for randomization
+     */
+    createCluster(startX, startY, terrainType, size, processed, noise) {
+        // Place the first tile
+        this.placeTerrain(startX, startY, terrainType);
+        processed[startY][startX] = true;
+        
+        // Use a queue for flood fill
+        const queue = [{x: startX, y: startY}];
+        let cellsPlaced = 1;
+        
+        // Directions for neighbor cells (including diagonals)
+        const directions = [
+            {x: 0, y: -1}, {x: 1, y: -1}, {x: 1, y: 0}, {x: 1, y: 1},
+            {x: 0, y: 1}, {x: -1, y: 1}, {x: -1, y: 0}, {x: -1, y: -1}
+        ];
+        
+        while (queue.length > 0 && cellsPlaced < size) {
+            // Get random element from queue instead of FIFO for more natural shapes
+            const randomIndex = Math.floor(Math.random() * queue.length);
+            const current = queue[randomIndex];
+            queue.splice(randomIndex, 1);
+            
+            // Shuffle directions for more organic growth
+            Phaser.Utils.Array.Shuffle(directions);
+            
+            // Try each direction
+            for (const dir of directions) {
+                const nx = current.x + dir.x;
+                const ny = current.y + dir.y;
+                
+                // Check bounds and if already processed
+                if (nx <= 3 || nx >= GRID_COLS - 3 || ny <= 3 || ny >= GRID_ROWS - 3 ||
+                    processed[ny][nx]) {
+                    continue;
+                }
+                
+                // Use noise to determine if we should place a tile (more natural clusters)
+                const noiseValue = noise.noise(nx * 0.2, ny * 0.2);
+                const probability = 0.7 + noiseValue * 0.3; // 40% to 100% chance based on noise
+                
+                if (Math.random() < probability) {
+                    this.placeTerrain(nx, ny, terrainType);
+                    processed[ny][nx] = true;
+                    queue.push({x: nx, y: ny});
+                    cellsPlaced++;
+                    
+                    if (cellsPlaced >= size) break;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Place a specific terrain type at the given coordinates
+     * @param {number} x - X coordinate
+     * @param {number} y - Y coordinate
+     * @param {number} terrainType - Type of terrain to place
+     */
+    placeTerrain(x, y, terrainType) {
+        const tile = this.terrainLayer.putTileAt(terrainType, x, y);
+        if (tile) {
+            const effect = this.effects[terrainType];
+            tile.properties = {
+                name: effect.name,
+                slowFactor: effect.slowFactor,
+                damage: effect.damage
+            };
+        }
     }
     
     /**
@@ -587,29 +835,6 @@ export default class TerrainSystem {
     }
     
     /**
-     * Handle collision with terrain
-     * @param {Phaser.GameObjects.GameObject} player - The player object
-     * @param {Phaser.Tilemaps.Tile} tile - The tile that was collided with
-     */
-    handleTerrainCollision(player, tile) {
-        if (tile.index === TERRAIN.SWAMP) {
-            // Apply damage to player when in swamp water
-            const damage = this.effects[TERRAIN.SWAMP].damage;
-            if (damage > 0 && player.damage) {
-                player.damage(damage);
-                
-                // Visual feedback for damage
-                this.scene.tweens.add({
-                    targets: player,
-                    alpha: 0.5,
-                    duration: 100,
-                    yoyo: true
-                });
-            }
-        }
-    }
-    
-    /**
      * Check terrain at a specific world position and return terrain effect
      * @param {number} x - World x position
      * @param {number} y - World y position
@@ -625,8 +850,8 @@ export default class TerrainSystem {
     }
     
     /**
-     * Apply terrain effects to the specified entity
-     * @param {object} entity - Entity to apply effects to (player, follower, enemy)
+     * Apply terrain effects to an entity based on its position
+     * @param {object} entity - The entity to apply effects to
      */
     applyTerrainEffects(entity) {
         if (!entity || !entity.active) return;
@@ -659,7 +884,7 @@ export default class TerrainSystem {
             }
         }
         
-        // Apply damage from terrain (like swamp) - only to player
+        // Apply damage from terrain (like swamp or border) - only to player
         if (terrainEffect.damage > 0 && entity.constructor.name === 'Player' && entity.damage) {
             // Use a damage timer to avoid applying damage every frame
             const currentTime = Date.now();
@@ -667,13 +892,26 @@ export default class TerrainSystem {
                 entity.damage(terrainEffect.damage);
                 entity.lastTerrainDamageTime = currentTime;
                 
-                // Show visual effect for swamp damage
-                this.scene.tweens.add({
-                    targets: entity,
-                    alpha: 0.6,
-                    duration: 100,
-                    yoyo: true
-                });
+                // Different visual effects based on terrain type
+                if (terrainEffect.name === 'Border') {
+                    // Border effect - red flash
+                    this.scene.cameras.main.flash(100, 255, 0, 0, 0.3);
+                    this.scene.tweens.add({
+                        targets: entity,
+                        alpha: 0.4,
+                        duration: 100,
+                        yoyo: true,
+                        repeat: 1
+                    });
+                } else {
+                    // Swamp effect - greenish flash
+                    this.scene.tweens.add({
+                        targets: entity,
+                        alpha: 0.6,
+                        duration: 100,
+                        yoyo: true
+                    });
+                }
                 
                 console.log(`Applied ${terrainEffect.damage} damage from ${terrainEffect.name} terrain`);
             }
@@ -746,5 +984,98 @@ export default class TerrainSystem {
                 }
             }
         }
+    }
+
+    addClearings() {
+        const numClearings = Math.floor((GRID_COLS * GRID_ROWS) / 1000); // Scale with map size
+        
+        for (let i = 0; i < numClearings; i++) {
+            const centerX = Math.floor(Math.random() * GRID_COLS);
+            const centerY = Math.floor(Math.random() * GRID_ROWS);
+            const radius = Math.floor(Math.random() * 5) + 3;
+            
+            // Create circular clearing
+            for (let y = -radius; y <= radius; y++) {
+                for (let x = -radius; x <= radius; x++) {
+                    if (x * x + y * y <= radius * radius) {
+                        const tileX = centerX + x;
+                        const tileY = centerY + y;
+                        
+                        if (tileX >= 0 && tileX < GRID_COLS && tileY >= 0 && tileY < GRID_ROWS) {
+                            this.terrainLayer.putTileAt(0, tileX, tileY);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    addObstacles() {
+        const numObstacles = Math.floor((GRID_COLS * GRID_ROWS) / 800); // Scale with map size
+        
+        for (let i = 0; i < numObstacles; i++) {
+            const x = Math.floor(Math.random() * GRID_COLS);
+            const y = Math.floor(Math.random() * GRID_ROWS);
+            const size = Math.floor(Math.random() * 3) + 2;
+            
+            // Create rectangular obstacle
+            for (let dy = 0; dy < size; dy++) {
+                for (let dx = 0; dx < size; dx++) {
+                    const tileX = x + dx;
+                    const tileY = y + dy;
+                    
+                    if (tileX >= 0 && tileX < GRID_COLS && tileY >= 0 && tileY < GRID_ROWS) {
+                        this.terrainLayer.putTileAt(4, tileX, tileY); // Obstacle tile
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Simple Perlin noise implementation
+class Perlin {
+    constructor() {
+        this.permutation = new Array(256).fill(0).map((_, i) => i);
+        for (let i = 255; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.permutation[i], this.permutation[j]] = [this.permutation[j], this.permutation[i]];
+        }
+        this.permutation = [...this.permutation, ...this.permutation];
+    }
+
+    noise(x, y) {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+        const u = this.fade(x);
+        const v = this.fade(y);
+        const A = this.permutation[X] + Y;
+        const B = this.permutation[X + 1] + Y;
+        return this.lerp(v,
+            this.lerp(u,
+                this.grad(this.permutation[A], x, y),
+                this.grad(this.permutation[B], x - 1, y)
+            ),
+            this.lerp(u,
+                this.grad(this.permutation[A + 1], x, y - 1),
+                this.grad(this.permutation[B + 1], x - 1, y - 1)
+            )
+        );
+    }
+
+    fade(t) {
+        return t * t * t * (t * (t * 6 - 15) + 10);
+    }
+
+    lerp(t, a, b) {
+        return a + t * (b - a);
+    }
+
+    grad(hash, x, y) {
+        const h = hash & 15;
+        const grad = 1 + (h & 7);
+        return ((h & 8) ? -grad : grad) * x + ((h & 4) ? -grad : grad) * y;
     }
 } 

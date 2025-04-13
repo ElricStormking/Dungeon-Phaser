@@ -16,13 +16,21 @@ export default class MovementSystem {
         this.lastEffectiveDelay = 150;
         this.collisionCooldown = false;
         this.boundaryCollisionCooldown = false;
+        
+        // Smooth movement properties
+        this.isMoving = false;
+        this.moveProgress = 1.0; // Start at 1.0 (completed)
+        this.targetPositions = []; // Array to hold target positions for each entity
+        this.startPositions = []; // Array to hold starting positions for each entity
+        this.moveDuration = 150; // Milliseconds for move animation
     }
     
     /**
      * Update movement and follow behavior
      * @param {number} time - Current game time
+     * @param {number} delta - Delta time in ms
      */
-    update(time) {
+    update(time, delta) {
         if (this.scene.gameOver) return;
         
         // Calculate move delay based on player speed
@@ -33,7 +41,6 @@ export default class MovementSystem {
             
             // Only adjust delay if the player is on slowing terrain
             if (slowFactor < 1.0) {
-                // Calculate effective delay (higher when slower)
                 this.effectiveMoveDelay = this.moveDelay / slowFactor;
                 
                 // For debugging
@@ -53,10 +60,84 @@ export default class MovementSystem {
             }
         }
         
-        // Move the snake periodically based on effectiveMoveDelay
-        if (time > this.moveTimer) {
+        // If we're in the middle of a smooth movement, update the lerping
+        if (this.isMoving) {
+            this.updateSmoothMovement(delta);
+        }
+        // Only start a new movement when the current one is complete
+        else if (time > this.moveTimer) {
             this.moveSnake();
             this.moveTimer = time + (this.effectiveMoveDelay || this.moveDelay);
+        }
+    }
+    
+    /**
+     * Update smooth movement lerping between grid positions
+     * @param {number} delta - Delta time in ms
+     */
+    updateSmoothMovement(delta) {
+        // Update movement progress
+        this.moveProgress += delta / this.moveDuration;
+        
+        // Cap progress at 1.0
+        if (this.moveProgress >= 1.0) {
+            this.moveProgress = 1.0;
+            this.isMoving = false;
+            
+            // Apply final positions and directions
+            const player = this.scene.player;
+            if (player) {
+                player.x = this.targetPositions[0].x;
+                player.y = this.targetPositions[0].y;
+                player.direction = this.direction;
+            }
+            
+            for (let i = 0; i < this.scene.followers.length; i++) {
+                const follower = this.scene.followers[i];
+                if (follower && follower.active && this.targetPositions[i + 1]) {
+                    follower.x = this.targetPositions[i + 1].x;
+                    follower.y = this.targetPositions[i + 1].y;
+                    follower.direction = this.targetPositions[i + 1].dir;
+                }
+            }
+            
+            // Apply queued direction change once movement is complete
+            this.direction = this.nextDirection;
+            return;
+        }
+        
+        // Apply interpolated positions
+        const player = this.scene.player;
+        if (player) {
+            player.x = Phaser.Math.Linear(
+                this.startPositions[0].x,
+                this.targetPositions[0].x,
+                this.moveProgress
+            );
+            player.y = Phaser.Math.Linear(
+                this.startPositions[0].y,
+                this.targetPositions[0].y,
+                this.moveProgress
+            );
+        }
+        
+        // Update follower positions with interpolation
+        for (let i = 0; i < this.scene.followers.length; i++) {
+            const follower = this.scene.followers[i];
+            if (follower && follower.active && 
+                this.startPositions[i + 1] && this.targetPositions[i + 1]) {
+                
+                follower.x = Phaser.Math.Linear(
+                    this.startPositions[i + 1].x,
+                    this.targetPositions[i + 1].x,
+                    this.moveProgress
+                );
+                follower.y = Phaser.Math.Linear(
+                    this.startPositions[i + 1].y,
+                    this.targetPositions[i + 1].y,
+                    this.moveProgress
+                );
+            }
         }
     }
     
@@ -88,16 +169,19 @@ export default class MovementSystem {
         const player = this.scene.player;
         if (!player) return;
         
+        // Don't start new movement if we're already moving
+        if (this.isMoving) return;
+        
         // Create positions array from current positions
-        const positions = [];
-        positions.push({ x: player.x, y: player.y, dir: this.direction });
+        this.startPositions = [];
+        this.startPositions.push({ x: player.x, y: player.y, dir: this.direction });
         
         // Create clean array of active followers
         const validFollowers = [];
         for (let i = 0; i < this.scene.followers.length; i++) {
             const follower = this.scene.followers[i];
             if (follower && follower.active) {
-                positions.push({ 
+                this.startPositions.push({ 
                     x: follower.x, 
                     y: follower.y, 
                     dir: follower.direction 
@@ -147,11 +231,22 @@ export default class MovementSystem {
             console.log(`Player hit boundary, taking ${boundaryCollisionDamage} damage`);
         }
         
-        // Apply player movement and enforce world boundaries
-        player.x = newX;
-        player.y = newY;
-        player.x = Phaser.Math.Clamp(player.x, halfTile, WORLD_WIDTH - halfTile);
-        player.y = Phaser.Math.Clamp(player.y, halfTile, WORLD_HEIGHT - halfTile);
+        // Enforce world boundaries for target position
+        newX = Phaser.Math.Clamp(newX, halfTile, WORLD_WIDTH - halfTile);
+        newY = Phaser.Math.Clamp(newY, halfTile, WORLD_HEIGHT - halfTile);
+        
+        // Set up target positions for smooth movement
+        this.targetPositions = [];
+        this.targetPositions.push({ 
+            x: newX, 
+            y: newY, 
+            dir: this.direction 
+        });
+        
+        // Set target positions for followers (each follows the position ahead of it)
+        for (let i = 0; i < this.startPositions.length - 1; i++) {
+            this.targetPositions.push(this.startPositions[i]);
+        }
         
         // Update player's direction property
         player.direction = this.direction;
@@ -161,14 +256,11 @@ export default class MovementSystem {
             player.setAngleFromDirection();
         }
         
-        // Move followers using the validated array
+        // Set angles for followers
         for (let i = 0; i < this.scene.followers.length; i++) {
             const follower = this.scene.followers[i];
-            const pos = positions[i];
             if (follower && follower.active) {
-                follower.x = pos.x;
-                follower.y = pos.y;
-                follower.direction = pos.dir;
+                follower.direction = this.targetPositions[i + 1].dir;
                 follower.setAngleFromDirection();
             }
         }
@@ -176,8 +268,12 @@ export default class MovementSystem {
         // Check for collisions with own body
         this.checkSelfCollision();
         
-        // Apply queued direction change
-        this.direction = this.nextDirection;
+        // Start smooth movement
+        this.isMoving = true;
+        this.moveProgress = 0.0;
+        
+        // Set movement duration based on delay
+        this.moveDuration = this.effectiveMoveDelay || this.moveDelay;
     }
     
     /**
@@ -236,5 +332,9 @@ export default class MovementSystem {
         this.lastEffectiveDelay = 150;
         this.collisionCooldown = false;
         this.boundaryCollisionCooldown = false;
+        this.isMoving = false;
+        this.moveProgress = 1.0;
+        this.targetPositions = [];
+        this.startPositions = [];
     }
 } 

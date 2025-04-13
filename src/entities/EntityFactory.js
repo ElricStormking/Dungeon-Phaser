@@ -5,6 +5,7 @@
 import Player from './Player.js';
 import Follower from './Follower.js';
 import { TILE_SIZE } from '../constants.js';
+import * as VisualEffects from '../utils/VisualEffects.js';
 
 export default class EntityFactory {
     /**
@@ -136,29 +137,11 @@ export default class EntityFactory {
         enemy.damage = function(amount) {
             this.health -= amount;
             
-            // Flash red on damage
-            this.scene.tweens.add({
-                targets: this,
-                alpha: 0.7,
-                duration: 100,
-                yoyo: true,
-                repeat: 1
-            });
+            // Flash red on damage using VisualEffects utility
+            VisualEffects.createEntityFlashEffect(this.scene, this, 0.7, 100, 1);
             
-            // Create hit effect
-            const hitEffect = this.scene.add.particles('particle').createEmitter({
-                x: this.x,
-                y: this.y,
-                speed: { min: 50, max: 100 },
-                scale: { start: 0.5, end: 0 },
-                lifespan: 300,
-                quantity: 5,
-                tint: 0xFFFFFF
-            });
-            
-            this.scene.time.delayedCall(300, () => {
-                hitEffect.manager.destroy();
-            });
+            // Create hit effect using VisualEffects utility
+            VisualEffects.createDamageParticles(this.scene, this.x, this.y, 0xFFFFFF, 5);
             
             // Die if health is depleted
             if (this.health <= 0) {
@@ -168,20 +151,8 @@ export default class EntityFactory {
         
         // Add die method
         enemy.die = function() {
-            // Death animation and particles
-            const deathEffect = this.scene.add.particles('particle').createEmitter({
-                x: this.x,
-                y: this.y,
-                speed: { min: 50, max: 150 },
-                scale: { start: 1, end: 0 },
-                lifespan: 800,
-                quantity: 15,
-                tint: this.tintTopLeft
-            });
-            
-            this.scene.time.delayedCall(800, () => {
-                deathEffect.manager.destroy();
-            });
+            // Death animation and particles using VisualEffects utility
+            VisualEffects.createDeathEffect(this.scene, this.x, this.y, this.tintTopLeft, 15);
             
             // Play sound
             if (this.scene.audioManager) {

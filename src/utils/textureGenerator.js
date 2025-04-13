@@ -308,172 +308,107 @@ function createArrowTexture(scene) {
  * @param {Phaser.Scene} scene - The scene to add textures to
  */
 function createTerrainTextures(scene) {
-    // Create texture for meadow (75% dark grey floor, 25% grass)
-    const meadowCanvas = document.createElement('canvas');
-    meadowCanvas.width = TILE_SIZE;
-    meadowCanvas.height = TILE_SIZE;
-    const meadowCtx = meadowCanvas.getContext('2d');
-    
-    // Base dark grey floor
-    meadowCtx.fillStyle = '#333333'; // Dark grey instead of brown dirt
-    meadowCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    
-    // Add grass patches (25% of the tile)
-    meadowCtx.fillStyle = '#228B22'; // Forest green
-    
-    // Add four small grass patches in different areas
-    const grassPatches = [
-        {x: 1, y: 1, w: 4, h: 4},
-        {x: TILE_SIZE - 5, y: 2, w: 3, h: 5},
-        {x: 3, y: TILE_SIZE - 6, w: 6, h: 3},
-        {x: TILE_SIZE - 7, y: TILE_SIZE - 4, w: 5, h: 2}
+    // Create terrain tileset with proper hex colors
+    const terrainConfig = [
+        { key: 'meadow', color: 0x90EE90 },  // Light green
+        { key: 'bush', color: 0x228B22 },    // Forest green
+        { key: 'forest', color: 0x006400 },  // Dark green
+        { key: 'swamp', color: 0x2F4F4F },   // Dark slate gray
+        { key: 'floor', color: 0x000000, alpha: 0 },    // Transparent
+        { key: 'border', color: 0xFF0000 }   // Red
     ];
+
+    // Create a single graphics object
+    const graphics = scene.add.graphics();
     
-    // Only draw some of these patches randomly to vary the look
-    grassPatches.forEach(patch => {
-        if (Math.random() < 0.7) { // 70% chance to draw each patch
-            meadowCtx.fillRect(patch.x, patch.y, patch.w, patch.h);
+    // Create a render texture for the entire tileset
+    const renderTexture = scene.add.renderTexture(0, 0, TILE_SIZE * terrainConfig.length, TILE_SIZE);
+    
+    // Draw each terrain type
+    terrainConfig.forEach((config, index) => {
+        graphics.clear();
+        
+        // Base tile color
+        if (config.key === 'floor') {
+            graphics.fillStyle(config.color, 0); // Transparent for floor
+        } else {
+            graphics.fillStyle(config.color);
         }
+        graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+        
+        // Add texture pattern based on terrain type
+        graphics.lineStyle(1, 0x000000, 0.2);
+        
+        switch (config.key) {
+            case 'meadow':
+                // Grass-like pattern
+                for (let i = 0; i < TILE_SIZE; i += 8) {
+                    graphics.lineBetween(i, TILE_SIZE - 4, i + 4, TILE_SIZE);
+                }
+                break;
+                
+            case 'bush':
+                // Bushy pattern
+                for (let i = 0; i < TILE_SIZE; i += 8) {
+                    for (let j = 0; j < TILE_SIZE; j += 8) {
+                        graphics.fillCircle(i + 4, j + 4, 2);
+                    }
+                }
+                break;
+                
+            case 'forest':
+                // Tree-like pattern
+                for (let i = 0; i < TILE_SIZE; i += 12) {
+                    for (let j = 0; j < TILE_SIZE; j += 12) {
+                        graphics.fillTriangle(
+                            i + 6, j + 2,
+                            i + 2, j + 10,
+                            i + 10, j + 10
+                        );
+                    }
+                }
+                break;
+                
+            case 'swamp':
+                // Swampy pattern
+                for (let i = 0; i < TILE_SIZE; i += 8) {
+                    for (let j = 0; j < TILE_SIZE; j += 8) {
+                        graphics.lineStyle(1, 0x000000, 0.3);
+                        graphics.strokeCircle(i + 4, j + 4, 3);
+                    }
+                }
+                break;
+                
+            case 'floor':
+                // No pattern for floor - keep it transparent
+                break;
+                
+            case 'border':
+                // Hazard pattern
+                graphics.lineStyle(3, 0xFFFFFF, 0.8);
+                for (let i = 0; i < TILE_SIZE; i += 12) {
+                    graphics.lineBetween(i, 0, i + 12, TILE_SIZE);
+                    graphics.lineBetween(0, i, TILE_SIZE, i + 12);
+                }
+                break;
+        }
+        
+        // Draw this terrain type to the tileset texture
+        renderTexture.draw(graphics, index * TILE_SIZE, 0);
     });
     
-    // Add some grass highlights
-    meadowCtx.fillStyle = '#32CD32'; // Lime green
-    for (let i = 0; i < 3; i++) {
-        const x = Math.random() * TILE_SIZE;
-        const y = Math.random() * TILE_SIZE;
-        const size = 1 + Math.random() * 2;
-        meadowCtx.fillRect(x, y, size, size);
-    }
-    scene.textures.addCanvas('meadow_tile', meadowCanvas);
+    // Save the complete tileset texture
+    renderTexture.saveTexture('terrain');
     
-    // Create texture for bush
-    const bushCanvas = document.createElement('canvas');
-    bushCanvas.width = TILE_SIZE;
-    bushCanvas.height = TILE_SIZE;
-    const bushCtx = bushCanvas.getContext('2d');
+    // Clean up
+    graphics.destroy();
+    renderTexture.destroy();
     
-    // Dark green background with texture
-    bushCtx.fillStyle = '#228B22'; // Forest green background
-    bushCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    
-    // Add texture to the background
-    bushCtx.fillStyle = '#1E7A1E'; // Slightly darker green for texture
-    for (let i = 0; i < 12; i++) {
-        const x = Math.random() * TILE_SIZE;
-        const y = Math.random() * TILE_SIZE;
-        const size = 1 + Math.random() * 2;
-        bushCtx.fillRect(x, y, size, size);
+    // Add frame data to make it a proper tileset
+    scene.textures.get('terrain').add('__BASE', 0, 0, 0, TILE_SIZE * terrainConfig.length, TILE_SIZE);
+    for (let i = 0; i < terrainConfig.length; i++) {
+        scene.textures.get('terrain').add(i, 0, i * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
     }
     
-    // Draw multiple small bush clumps instead of one large one
-    bushCtx.fillStyle = '#006400'; // Dark green for bushes
-    
-    // Add 3-4 bush clusters instead of just one
-    const clumpCount = 3 + Math.floor(Math.random() * 2);
-    const positions = [
-        {x: TILE_SIZE/3, y: TILE_SIZE/3, r: TILE_SIZE/5},
-        {x: 2*TILE_SIZE/3, y: TILE_SIZE/3, r: TILE_SIZE/6},
-        {x: TILE_SIZE/3, y: 2*TILE_SIZE/3, r: TILE_SIZE/6},
-        {x: 2*TILE_SIZE/3, y: 2*TILE_SIZE/3, r: TILE_SIZE/5}
-    ];
-    
-    // Draw each bush clump
-    for (let i = 0; i < clumpCount; i++) {
-        const pos = positions[i];
-        bushCtx.beginPath();
-        bushCtx.arc(pos.x, pos.y, pos.r, 0, Math.PI * 2);
-        bushCtx.fill();
-    }
-    
-    // Add highlights randomly to bush clumps
-    bushCtx.fillStyle = '#90EE90'; // Light green
-    for (let i = 0; i < 2; i++) {
-        const pos = positions[Math.floor(Math.random() * clumpCount)];
-        bushCtx.beginPath();
-        bushCtx.arc(pos.x - pos.r/2, pos.y - pos.r/2, pos.r/3, 0, Math.PI * 2);
-        bushCtx.fill();
-    }
-    
-    scene.textures.addCanvas('bush_tile', bushCanvas);
-    
-    // Create texture for forest
-    const forestCanvas = document.createElement('canvas');
-    forestCanvas.width = TILE_SIZE;
-    forestCanvas.height = TILE_SIZE;
-    const forestCtx = forestCanvas.getContext('2d');
-    forestCtx.fillStyle = '#228B22'; // Forest green background
-    forestCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    
-    // Draw tree trunk
-    forestCtx.fillStyle = '#8B4513'; // Brown
-    forestCtx.fillRect(TILE_SIZE / 2 - 2, TILE_SIZE / 2, 4, TILE_SIZE / 2);
-    
-    // Draw tree top
-    forestCtx.fillStyle = '#006400'; // Dark green
-    forestCtx.beginPath();
-    forestCtx.moveTo(TILE_SIZE / 4, TILE_SIZE / 2);
-    forestCtx.lineTo(3 * TILE_SIZE / 4, TILE_SIZE / 2);
-    forestCtx.lineTo(TILE_SIZE / 2, TILE_SIZE / 6);
-    forestCtx.fill();
-    forestCtx.beginPath();
-    forestCtx.moveTo(TILE_SIZE / 4 + 2, TILE_SIZE / 2 - 3);
-    forestCtx.lineTo(3 * TILE_SIZE / 4 - 2, TILE_SIZE / 2 - 3);
-    forestCtx.lineTo(TILE_SIZE / 2, TILE_SIZE / 6 - 5);
-    forestCtx.fill();
-    
-    scene.textures.addCanvas('forest_tile', forestCanvas);
-    
-    // Create texture for swamp
-    const swampCanvas = document.createElement('canvas');
-    swampCanvas.width = TILE_SIZE;
-    swampCanvas.height = TILE_SIZE;
-    const swampCtx = swampCanvas.getContext('2d');
-    swampCtx.fillStyle = '#2F4F4F'; // Dark Slate Gray (murky water)
-    swampCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    
-    // Add murky water surface effects
-    swampCtx.fillStyle = '#3D5B5B'; // Slightly lighter for ripples
-    for (let i = 0; i < 8; i++) {
-        const x = Math.random() * TILE_SIZE;
-        const y = Math.random() * TILE_SIZE;
-        const size = 1 + Math.random() * 3;
-        swampCtx.fillRect(x, y, size, size);
-    }
-    
-    // Add some swamp grass tufts
-    swampCtx.fillStyle = '#006400'; // Dark green
-    for (let i = 0; i < 3; i++) {
-        const x = Math.random() * TILE_SIZE;
-        const y = Math.random() * TILE_SIZE;
-        const height = 2 + Math.random() * 3;
-        swampCtx.fillRect(x, y, 1, height);
-    }
-    
-    scene.textures.addCanvas('swamp_tile', swampCanvas);
-    
-    // Create texture for floor (pure black)
-    const floorCanvas = document.createElement('canvas');
-    floorCanvas.width = TILE_SIZE;
-    floorCanvas.height = TILE_SIZE;
-    const floorCtx = floorCanvas.getContext('2d');
-    floorCtx.fillStyle = '#000000'; // Pure black
-    floorCtx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    
-    scene.textures.addCanvas('floor_tile', floorCanvas);
-    
-    // Create a tileset texture that contains all terrain tiles
-    const tilesetCanvas = document.createElement('canvas');
-    tilesetCanvas.width = TILE_SIZE * 5; // 5 tile types
-    tilesetCanvas.height = TILE_SIZE;
-    const tilesetCtx = tilesetCanvas.getContext('2d');
-    
-    // Draw each tile into the tileset
-    tilesetCtx.drawImage(meadowCanvas, 0, 0);
-    tilesetCtx.drawImage(bushCanvas, TILE_SIZE, 0);
-    tilesetCtx.drawImage(forestCanvas, TILE_SIZE * 2, 0);
-    tilesetCtx.drawImage(swampCanvas, TILE_SIZE * 3, 0);
-    tilesetCtx.drawImage(floorCanvas, TILE_SIZE * 4, 0);
-    
-    // Add the tileset to the texture manager
-    scene.textures.addCanvas('terrain_tiles', tilesetCanvas);
+    console.log('Terrain textures generated successfully');
 } 

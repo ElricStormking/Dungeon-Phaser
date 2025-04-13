@@ -20,6 +20,9 @@ export default class SpawnSystem {
         this.totalWaves = 5;
         this.waveActive = false;
         this.enemiesRemainingInWave = 0;
+        this.enemiesSpawnedInWave = 0;  // Track enemies spawned in current wave
+        this.enemiesKilledInWave = 0;   // Track enemies actually killed in current wave
+        this.totalEnemies = 0;          // Total enemies planned for this wave
         this.waveSpawnInterval = null;
         this.waveCooldown = false;
         this.bossDefeated = false;
@@ -65,9 +68,14 @@ export default class SpawnSystem {
             this.startRegularWave();
         }
         
-        // Show wave notification
-        const waveText = isBossWave ? 'BOSS WAVE!' : `WAVE ${this.currentWave} / ${this.totalWaves}`;
-        this.showWaveNotification(waveText);
+        // Update UI manager with wave information
+        if (this.scene.uiManager) {
+            // Show wave notification
+            this.scene.uiManager.showWaveNotification(this.currentWave, this.totalWaves, isBossWave);
+        } else {
+            // Fallback to old notification if UIManager isn't available
+            this.showWaveNotification(isBossWave ? 'BOSS WAVE!' : `WAVE ${this.currentWave} / ${this.totalWaves}`);
+        }
     }
     
     /**
@@ -76,7 +84,33 @@ export default class SpawnSystem {
     startRegularWave() {
         // Get wave configuration based on current level and wave
         const waveConfig = this.getWaveConfiguration();
+        
+        // Reset counters for new wave
         this.enemiesRemainingInWave = waveConfig.totalEnemies;
+        this.enemiesSpawnedInWave = 0; 
+        this.enemiesKilledInWave = 0;  
+        this.totalEnemies = waveConfig.totalEnemies;
+        
+        // Force garbage collection to prevent memory leaks with many enemies
+        if (window.gc) {
+            try {
+                window.gc();
+            } catch (e) {}
+        }
+        
+        console.log(`[SpawnSystem] Starting wave ${this.currentWave} with ${this.totalEnemies} enemies. Kill count reset to 0.`);
+        
+        // Update UI with initial wave information
+        if (this.scene.uiManager) {
+            this.scene.uiManager.updateWaveInfo(
+                this.currentWave,
+                this.totalWaves,
+                this.enemiesRemainingInWave,
+                this.totalEnemies,
+                this.enemiesSpawnedInWave,
+                this.enemiesKilledInWave
+            );
+        }
         
         // Create wave spawn interval
         this.waveSpawnInterval = this.scene.time.addEvent({
@@ -93,6 +127,19 @@ export default class SpawnSystem {
                     const enemyType = this.selectEnemyTypeForWave(waveConfig);
                     this.spawnEnemyOfType(enemyType);
                     this.enemiesRemainingInWave--;
+                    this.enemiesSpawnedInWave++; // Increment spawned counter
+                    
+                    // Update UI with remaining enemies count
+                    if (this.scene.uiManager) {
+                        this.scene.uiManager.updateWaveInfo(
+                            this.currentWave,
+                            this.totalWaves,
+                            this.enemiesRemainingInWave,
+                            this.totalEnemies,
+                            this.enemiesSpawnedInWave,
+                            this.enemiesKilledInWave
+                        );
+                    }
                 }
                 
                 // If all enemies spawned and none active, wave is complete
@@ -112,12 +159,30 @@ export default class SpawnSystem {
         // Calculate stage number (1-4)
         const stageNumber = Math.ceil(this.currentLevel / 8);
         
-        // Spawn the boss
-        const boss = this.spawnBoss(stageNumber);
-        
-        // Also spawn some regular enemies - doubled the count to match regular wave increase
+        // Reset counters for boss wave
         const supportEnemyCount = (5 + stageNumber * 3) * 2;
         this.enemiesRemainingInWave = supportEnemyCount;
+        this.enemiesSpawnedInWave = 0; 
+        this.enemiesKilledInWave = 0;  
+        this.totalEnemies = supportEnemyCount + 1; // +1 for the boss
+        
+        console.log(`[SpawnSystem] Starting BOSS wave ${this.currentWave}! Enemy count: ${this.totalEnemies} (including boss).`);
+        
+        // Spawn the boss
+        const boss = this.spawnBoss(stageNumber);
+        this.enemiesSpawnedInWave++; // Count boss as spawned
+        
+        // Update UI with initial wave information
+        if (this.scene.uiManager) {
+            this.scene.uiManager.updateWaveInfo(
+                this.currentWave,
+                this.totalWaves,
+                this.enemiesRemainingInWave,
+                this.totalEnemies,
+                this.enemiesSpawnedInWave,
+                this.enemiesKilledInWave
+            );
+        }
         
         // Create wave spawn interval - spawn support enemies more slowly
         this.waveSpawnInterval = this.scene.time.addEvent({
@@ -133,8 +198,12 @@ export default class SpawnSystem {
                     if (!this.bossDefeated) {
                         this.bossDefeated = true;
                         
-                        // Show boss defeated message
-                        this.showWaveNotification('BOSS DEFEATED!');
+                        // Show boss defeated message using UIManager if available
+                        if (this.scene.uiManager) {
+                            this.scene.uiManager.showWaveCompleteNotification();
+                        } else {
+                            this.showWaveNotification('BOSS DEFEATED!');
+                        }
                         
                         // Clear any remaining enemies
                         this.scene.enemies.getChildren().forEach(enemy => {
@@ -159,6 +228,19 @@ export default class SpawnSystem {
                     const randomType = enemyTypes[Phaser.Math.Between(0, enemyTypes.length - 1)];
                     this.spawnEnemyOfType(randomType);
                     this.enemiesRemainingInWave--;
+                    this.enemiesSpawnedInWave++; // Increment spawned counter
+                    
+                    // Update UI with remaining enemies count
+                    if (this.scene.uiManager) {
+                        this.scene.uiManager.updateWaveInfo(
+                            this.currentWave,
+                            this.totalWaves,
+                            this.enemiesRemainingInWave,
+                            this.totalEnemies,
+                            this.enemiesSpawnedInWave,
+                            this.enemiesKilledInWave
+                        );
+                    }
                 }
             },
             callbackScope: this,
@@ -177,8 +259,37 @@ export default class SpawnSystem {
         this.waveActive = false;
         this.waveCooldown = true;
         
-        // Show wave complete notification
-        this.showWaveNotification('WAVE COMPLETE!');
+        // Debug log for wave completion
+        console.log(`[SpawnSystem] Wave ${this.currentWave} complete! Final stats:
+            - Total enemies: ${this.totalEnemies}
+            - Spawned: ${this.enemiesSpawnedInWave}
+            - Killed: ${this.enemiesKilledInWave}`);
+        
+        // Final UI update when wave is complete
+        if (this.scene.uiManager) {
+            // For visual clarity at wave completion, show all enemies as killed
+            // but maintain the actual count for debugging
+            const actualKilled = this.enemiesKilledInWave;
+            this.enemiesKilledInWave = this.enemiesSpawnedInWave;
+            
+            // Update to show all enemies are killed (0 remaining)
+            this.scene.uiManager.updateWaveInfo(
+                this.currentWave,
+                this.totalWaves,
+                0, // No enemies remaining
+                this.totalEnemies, // Total enemies planned for wave
+                this.enemiesSpawnedInWave, // All spawned
+                this.enemiesSpawnedInWave // All considered killed at wave end
+            );
+            
+            // Show wave complete notification
+            this.scene.uiManager.showWaveCompleteNotification();
+            
+            // Restore actual count for debugging
+            this.enemiesKilledInWave = actualKilled;
+        } else {
+            this.showWaveNotification('WAVE COMPLETE!');
+        }
         
         // Reward the player
         this.spawnPickup();
@@ -462,64 +573,36 @@ export default class SpawnSystem {
      * @returns {Enemy} The spawned boss
      */
     spawnBoss(stageNumber) {
-        // Calculate spawn position
+        // Calculate spawn position - far enough from player to give reaction time
         const distanceFromPlayer = TILE_SIZE * 15;
         const randomAngle = Math.random() * Math.PI * 2;
         const spawnX = this.scene.player.x + Math.cos(randomAngle) * distanceFromPlayer;
         const spawnY = this.scene.player.y + Math.sin(randomAngle) * distanceFromPlayer;
         
-        // Boss config specific to stage
-        const bossConfig = {
-            isBoss: true,
-            type: 'boss',
-            health: 100 + stageNumber * 50,
-            scale: 2,
-            speed: 50 + stageNumber * 5,
-            attackDamage: 5 + stageNumber,
-            experienceValue: 100,
-            stage: stageNumber
-        };
+        // Use the Enemy factory method to create the boss with all the enhancements
+        const boss = Enemy.createBoss(this.scene, spawnX, spawnY, stageNumber);
         
-        // Create boss
-        const boss = new Enemy(this.scene, spawnX, spawnY, bossConfig);
+        // Add boss to enemies group
+        this.scene.enemies.add(boss);
         
-        // Play boss spawn sound
-        if (this.scene.audioManager) {
-            this.scene.audioManager.playSFX('boss_spawn');
+        // Make sure any added enemies are tracked properly in the wave
+        if (this.waveActive) {
+            // Boss counts more in wave progress
+            this.enemiesSpawnedInWave += 5;
+            this.totalEnemies += 5;
             
-            // Also shake the camera for dramatic effect
-            this.scene.cameras.main.shake(300, 0.008);
+            // Update UI with the new enemy counts
+            if (this.scene.uiManager) {
+                this.scene.uiManager.updateWaveInfo(
+                    this.currentWave,
+                    this.totalWaves,
+                    this.enemiesRemainingInWave,
+                    this.totalEnemies,
+                    this.enemiesSpawnedInWave,
+                    this.enemiesKilledInWave
+                );
+            }
         }
-        
-        // Show boss warning
-        const bossNames = ['Summoner', 'Berserker', 'Mad Alchemist', 'Lich King'];
-        const bossName = bossNames[stageNumber - 1] || 'Boss';
-        
-        const warningText = this.scene.add.text(
-            this.scene.cameras.main.worldView.centerX,
-            this.scene.cameras.main.worldView.centerY,
-            `${bossName} HAS APPEARED!`,
-            {
-                fontSize: '36px',
-                fontFamily: 'Arial',
-                color: '#FF0000',
-                stroke: '#000000',
-                strokeThickness: 6,
-                align: 'center'
-            }
-        ).setOrigin(0.5).setScrollFactor(0).setDepth(100);
-        
-        // Flash the text
-        this.scene.tweens.add({
-            targets: warningText,
-            alpha: 0,
-            yoyo: true,
-            repeat: 5,
-            duration: 300,
-            onComplete: () => {
-                warningText.destroy();
-            }
-        });
         
         return boss;
     }

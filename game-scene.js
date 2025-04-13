@@ -574,18 +574,47 @@ class GameScene extends Phaser.Scene {
     
     preload() {
         // Preload all assets
-        this.load.image('player', 'assets/player.png');
+        this.load.spritesheet('warrior', 'assets/images/characters/warrior.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
         this.load.image('follower', 'assets/follower.png');
         this.load.image('enemy', 'assets/enemy.png');
         this.load.image('pickup', 'assets/pickup.png');
         this.load.image('bullet', 'assets/bullet.png');
         this.load.image('particle', 'assets/particle.png');
         
+        // Load animation data
+        this.load.json('warrior_animations', 'assets/images/characters/warrior_animations.anim');
+        
         // Preload CSV files for class stats
         this.classLoader.preload();
     }
     
     create() {
+        // Load animation data
+        const animData = this.cache.json.get('warrior_animations');
+        if (animData && animData.anims) {
+            animData.anims.forEach(anim => {
+                if (!this.anims.exists(anim.key)) {
+                    this.anims.create({
+                        key: anim.key,
+                        frames: anim.frames.map(f => ({ 
+                            key: f.key, 
+                            frame: f.frame,
+                            duration: f.duration 
+                        })),
+                        frameRate: anim.frameRate,
+                        repeat: anim.repeat,
+                        skipMissedFrames: anim.skipMissedFrames
+                    });
+                }
+            });
+        }
+        
         // Load class data from CSV files
         this.classLoader.load();
         
@@ -1534,7 +1563,7 @@ class GameScene extends Phaser.Scene {
                         this.heroClasses[heroKey].specialAttack = (scene, entity) => {
                             // Sword sweep (damages all nearby enemies)
                             const range = TILE_SIZE * csvData.range; // Use CSV range
-                            console.log(`Warrior attack using range: ${csvData.range} (${range} pixels)`);
+                            console.log(`Warrior attack using range: ${csvData.range} (${csvData.range} pixels)`);
                             
                             const position = entity.getComponent('PositionComponent');
                             let enemiesHit = 0;

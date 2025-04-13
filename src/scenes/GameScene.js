@@ -84,33 +84,56 @@ export default class GameScene extends Phaser.Scene {
      * Load assets and prepare textures
      */
     preload() {
-        console.log('GameScene preload started');
-        // Textures are already created in TitleScene preload
-        // If running GameScene directly, uncomment the line below:
-        // createGameTextures(this);
+        console.log('GameScene preload - Starting preload process');
         
-        // Load warrior sprite sheet with correct dimensions
-        this.load.spritesheet('warrior', 'assets/warrior.png', { 
-            frameWidth: 32, 
-            frameHeight: 32,
-            spacing: 0,
-            margin: 0
+        // Initialize audio manager
+        if (!this.audioManager) {
+            console.log('Initializing AudioManager in GameScene preload');
+            this.audioManager = new AudioManager(this);
+            this.audioManager.init();
+        }
+        
+        // Load all map backgrounds
+        this.load.image('gamemap_01', 'assets/images/backgrounds/gamemap_01.jpg');
+        this.load.image('gamemap_02', 'assets/images/backgrounds/gamemap_02.jpg');
+        this.load.image('gamemap_03', 'assets/images/backgrounds/gamemap_03.jpg');
+        this.load.image('gamemap_04', 'assets/images/backgrounds/gamemap_04.jpg');
+        
+        // Load character assets
+        this.load.spritesheet('warrior', 'assets/images/characters/warrior.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        this.load.json('warrior_animations', 'assets/images/characters/warrior_animations.anim');
+        
+        // Load enemy assets
+        this.load.spritesheet('enemy', 'assets/images/enemies/basic_enemy.png', {
+            frameWidth: 32,
+            frameHeight: 32
         });
         
-        // Initialize audio manager and load audio assets
-        this.audioManager = new AudioManager(this);
-        this.audioManager.init();
+        // Load combat assets
+        this.load.image('bullet', 'assets/images/projectiles/bullet.png');
+        this.load.image('particle', 'assets/images/effects/particle.png');
+        this.load.image('arrow', 'assets/images/projectiles/arrow.png');
         
-        console.log('GameScene assets available');
+        console.log('GameScene preload - Assets loaded');
     }
 
     /**
      * Create all game objects, systems, and set up the game world
      */
     create() {
-        console.log('GameScene create started');
+        console.log('GameScene create - Starting game scene setup');
 
-        // --- Set World Bounds ---
+        // Create the game map - directly use imported constants 
+        
+        // Add background image (default to stage 1)
+        this.updateBackgroundForLevel(1);
+        
+        // Set world bounds
         this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
         // Make sure title music is stopped before playing level music
@@ -161,12 +184,18 @@ export default class GameScene extends Phaser.Scene {
         
         // Ensure audio context is unlocked by user interaction before playing music
         this.input.once('pointerdown', () => {
+            console.log('User interaction detected, trying to play level music');
             this.startLevelMusic();
         });
         
-        // Also try to play music directly, but this might be blocked by browsers
-        this.time.delayedCall(500, () => {
-            this.startLevelMusic();
+        // Also try to play music directly, with a slightly longer delay
+        this.time.delayedCall(1000, () => {
+            if (this.audioManager && this.audioManager.initialized) {
+                console.log('Delayed attempt to start level music');
+                this.startLevelMusic();
+            } else {
+                console.warn('Audio manager not ready for delayed music start');
+            }
         });
         
         console.log('GameScene create completed');
@@ -247,8 +276,11 @@ export default class GameScene extends Phaser.Scene {
         // Set camera bounds to match the world size
         camera.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-        // Reduced zoom to show more of the game world with larger tiles
-        camera.setZoom(0.6);
+        // Calculate zoom to fit game canvas size
+        const zoomX = GAME_WIDTH / camera.width;
+        const zoomY = GAME_HEIGHT / camera.height;
+        const zoom = Math.min(zoomX, zoomY);
+        camera.setZoom(zoom);
         
         // Enable camera follow with smoother lerp values
         camera.startFollow(this.player, true, 0.08, 0.08);
@@ -259,10 +291,7 @@ export default class GameScene extends Phaser.Scene {
         // Add camera fade-in effect on start
         camera.fadeIn(1000, 0, 0, 0);
         
-        // Ensure UI stays fixed by confirming all UI elements have setScrollFactor(0)
-        // This makes UI elements stay in position even as the camera moves
-        
-        console.log('Camera setup with zoom level 0.6 and following player');
+        console.log('Camera setup with calculated zoom level:', zoom);
     }
     
     /**
@@ -303,21 +332,36 @@ export default class GameScene extends Phaser.Scene {
         // Create movement system
         this.movementSystem = new MovementSystem(this);
         
+        // Create UI manager first so the background is created
+        this.uiManager = new UIManager(this);
+        
         // Create spawn system
         this.spawnSystem = new SpawnSystem(this);
         
+        // Initialize wave information in the UI
+        if (this.uiManager && this.spawnSystem) {
+            this.uiManager.updateWaveInfo(
+                this.spawnSystem.currentWave,
+                this.spawnSystem.totalWaves,
+                0,  // No enemies yet
+                0   // No enemies yet
+            );
+        }
+        
         // Create combat system
         this.combatSystem = new CombatSystem(this);
-        
-        // Create UI manager first so the background is created
-        this.uiManager = new UIManager(this);
         
         // Create level system after UI manager (to appear on top of the UI background)
         this.levelSystem = new LevelSystem(this);
         this.levelSystem.createUI();
         this.currentLevel = this.levelSystem.currentLevel; // Sync current level
         
-        // Audio manager is initialized in preload
+        // Initialize audio manager if it doesn't exist
+        if (!this.audioManager) {
+            console.log('Creating AudioManager in createSystems');
+            this.audioManager = new AudioManager(this);
+            this.audioManager.init();
+        }
     }
     
     /**
@@ -327,16 +371,25 @@ export default class GameScene extends Phaser.Scene {
         // Create the UI elements with a consistent depth
         const uiDepth = 100;
         
-        // Wave text (shows during wave)
-        this.waveText = this.add.text(GAME_WIDTH - 150, 20, '', {
-            fontSize: '16px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 3
-        })
-        .setScrollFactor(0)
-        .setDepth(uiDepth);
+        // Position values for the right side of the screen
+        const rightPadding = GAME_WIDTH - 220;
+        
+        // Generate healthbar graphics procedurally instead of loading images
+        // Background bar (dark gray)
+        this.healthBarBg = this.add.graphics();
+        this.healthBarBg.fillStyle(0x333333, 1);
+        this.healthBarBg.fillRect(rightPadding, 20, 200, 20);
+        this.healthBarBg.lineStyle(2, 0x555555, 1);
+        this.healthBarBg.strokeRect(rightPadding, 20, 200, 20);
+        this.healthBarBg.setScrollFactor(0);
+        this.healthBarBg.setDepth(uiDepth);
+        
+        // Health fill (green)
+        this.healthBarFill = this.add.graphics();
+        this.healthBarFill.fillStyle(0x00ff00, 1);
+        this.healthBarFill.fillRect(rightPadding, 20, 200, 20);
+        this.healthBarFill.setScrollFactor(0);
+        this.healthBarFill.setDepth(uiDepth);
         
         // Ready indicator (shows between waves)
         this.readyText = this.add.text(GAME_WIDTH - 150, 20, 'READY', {
@@ -350,10 +403,10 @@ export default class GameScene extends Phaser.Scene {
         .setDepth(uiDepth)
         .setVisible(false);
         
-        // Health display - positioned in the right side of the UI bar
+        // Health display - positioned to the left of the health bar
         this.healthText = this.add.text(
-            GAME_WIDTH - UI_PADDING - 20, 
-            UI_PADDING + 50, 
+            rightPadding - 10, 
+            20, 
             'Health: 0/0', 
             {
                 fontSize: '20px',
@@ -372,10 +425,14 @@ export default class GameScene extends Phaser.Scene {
     }
     
     /**
-     * Update health display text
+     * Update health display text and bar
      */
     updateHealthDisplay() {
         if (this.player && this.healthText) {
+            // Position values for the right side of the screen
+            const rightPadding = GAME_WIDTH - 220;
+            
+            // Update text
             this.healthText.setText(`Health: ${Math.floor(this.player.health)}/${this.player.maxHealth}`);
             
             // Color based on health percent
@@ -387,6 +444,14 @@ export default class GameScene extends Phaser.Scene {
                 color = '#ffff00'; // Yellow
             }
             this.healthText.setColor(color);
+            
+            // Update health bar fill
+            if (this.healthBarFill) {
+                this.healthBarFill.clear();
+                this.healthBarFill.fillStyle(parseInt(color.replace('#', '0x')), 1);
+                const fillWidth = Math.max(0, Math.min(200 * healthPercent, 200));
+                this.healthBarFill.fillRect(rightPadding, 20, fillWidth, 20);
+            }
         }
     }
     
@@ -417,7 +482,7 @@ export default class GameScene extends Phaser.Scene {
         this.handleInput(time);
         
         // Update movement based on timer
-        this.movementSystem.update(time);
+        this.movementSystem.update(time, delta);
         
         // Update UI
         this.uiManager.update();
@@ -603,30 +668,72 @@ export default class GameScene extends Phaser.Scene {
             this.audioManager.playLevelBGM(level);
         }
         
+        // Update background image for the current level
+        this.updateBackgroundForLevel(level);
+        
         // Adjust game difficulty based on level
         this.spawnSystem.adjustEnemySpawnRate(level);
     }
 
     /**
-     * Start the level music with proper handling
+     * Start level music
      */
     startLevelMusic() {
-        if (!this.audioManager) return;
+        // If audio manager isn't initialized, try to initialize it
+        if (!this.audioManager) {
+            console.log('AudioManager not found, attempting to initialize...');
+            try {
+                this.audioManager = new AudioManager(this);
+                this.audioManager.init();
+            } catch (error) {
+                console.error('Failed to initialize AudioManager:', error);
+                return;
+            }
+        }
+        
+        if (!this.audioManager.initialized) {
+            console.warn('Cannot play level music - audio manager not fully initialized');
+            return;
+        }
         
         console.log(`Starting level music for level ${this.currentLevel}`);
         
-        // Explicitly try stage1 music first
         try {
-            this.audioManager.playMusic('bgm_stage1', true, 500);
+            // Use the proper method to play level-based music
+            this.audioManager.playLevelBGM(this.currentLevel);
         } catch (error) {
-            console.warn('Error playing stage1 music directly:', error);
-            
-            // Fallback to level-based music
-            try {
-                this.audioManager.playLevelBGM(this.currentLevel);
-            } catch (error) {
-                console.warn('Error playing level BGM:', error);
-            }
+            console.warn('Error playing level BGM:', error);
         }
+    }
+
+    /**
+     * Update the background image based on the current level/stage
+     * @param {number} level - Current game level
+     */
+    updateBackgroundForLevel(level) {
+        // Directly use imported constants
+        
+        // Determine which background to use based on level
+        let backgroundKey = 'gamemap_01';
+        
+        if (level >= 16) {
+            backgroundKey = 'gamemap_04';  // Stage 4 (levels 16+)
+        } else if (level >= 11) {
+            backgroundKey = 'gamemap_03';  // Stage 3 (levels 11-15)
+        } else if (level >= 6) {
+            backgroundKey = 'gamemap_02';  // Stage 2 (levels 6-10)
+        }
+        
+        console.log(`Setting background for level ${level}: ${backgroundKey}`);
+        
+        // Remove previous background if it exists
+        if (this.background) {
+            this.background.destroy();
+        }
+        
+        // Create new background with appropriate image
+        this.background = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, backgroundKey);
+        this.background.setDisplaySize(WORLD_WIDTH, WORLD_HEIGHT);
+        this.background.setDepth(-10); // Set a negative depth to ensure it renders below terrain
     }
 } 

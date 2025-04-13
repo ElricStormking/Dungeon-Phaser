@@ -1,4 +1,5 @@
 import { TILE_SIZE } from '../constants.js';
+import * as VisualEffects from '../utils/VisualEffects.js';
 
 /**
  * Pickup class for collectible items
@@ -44,23 +45,7 @@ export default class Pickup extends Phaser.Physics.Arcade.Sprite {
      * Create visual effect when collected
      */
     createCollectionEffect() {
-        const emitter = this.scene.add.particles(this.x, this.y, 'particle', {
-            speed: { min: 50, max: 150 },
-            angle: { min: 0, max: 360 },
-            scale: { start: 0.8, end: 0 },
-            lifespan: { min: 300, max: 500 },
-            quantity: 15,
-            tint: 0xFFFF00,
-            blendMode: 'ADD',
-            emitting: false
-        });
-        
-        if (emitter) {
-            emitter.explode(15);
-            this.scene.time.delayedCall(500, () => {
-                if (emitter) emitter.destroy();
-            });
-        }
+        VisualEffects.createDeathEffect(this.scene, this.x, this.y, 0xFFFF00, 15);
     }
     
     /**

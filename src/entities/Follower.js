@@ -57,7 +57,10 @@ export default class Follower extends Character {
             case 'Chronotemporal': case 'Ice Mage': 
                 baseAttackCooldown = 4500; 
                 break;
-            case 'Shroom Pixie': case 'Goblin Trapper': 
+            case 'Goblin Trapper': 
+                baseAttackCooldown = 15000; // 15 seconds for Mega Bomb
+                break;
+            case 'Shroom Pixie': 
                 baseAttackCooldown = 4000; 
                 break;
             default:

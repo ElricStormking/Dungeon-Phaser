@@ -68,6 +68,15 @@ export default class CombatSystem {
             null, 
             this
         );
+        
+        // Enemy Projectiles vs Player
+        scene.physics.add.overlap(
+            scene.bullets,
+            scene.player,
+            this.handleEnemyProjectilePlayerCollision,
+            null,
+            this
+        );
     }
     
     /**
@@ -322,6 +331,27 @@ export default class CombatSystem {
         
         // Apply damage to follower
         follower.damage(bullet.damage || 1);
+        
+        // Destroy the bullet on impact
+        bullet.destroy();
+    }
+    
+    /**
+     * Handle collision between enemy projectiles and player
+     * @param {Projectile} bullet - The enemy projectile
+     * @param {Player} player - The player
+     */
+    handleEnemyProjectilePlayerCollision(bullet, player) {
+        // Only process if it's an enemy projectile and player is not invulnerable
+        if (!bullet.active || !player.active || !bullet.isEnemyProjectile || player.isInvulnerable) return;
+        
+        console.log("Enemy projectile hit player:", bullet);
+        
+        // Apply damage to player
+        player.damage(bullet.damage || 1);
+        
+        // Make player briefly invulnerable
+        player.setInvulnerable();
         
         // Destroy the bullet on impact
         bullet.destroy();

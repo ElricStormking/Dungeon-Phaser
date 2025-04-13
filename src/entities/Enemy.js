@@ -1,5 +1,7 @@
 import Character from './Character.js';
 import { TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT } from '../constants.js';
+import * as VisualEffects from '../utils/VisualEffects.js';
+import Projectile from './Projectile.js';
 
 /**
  * Enemy class representing monsters that chase the player
@@ -17,9 +19,10 @@ export default class Enemy extends Character {
         // Enemy type and behavior
         this.enemyType = config.enemyType || 'melee';
         this.isBoss = config.isBoss || false;
+        this.bossType = config.bossType || 'summoner';
         
-        // Movement and targeting
-        this.speed = config.speed || 50;
+        // Movement and targeting - 1.5x speed instead of 2x
+        this.speed = (config.speed || 50) * 3;
         this.originalSpeed = this.speed;
         
         // Combat properties
@@ -30,7 +33,7 @@ export default class Enemy extends Character {
         // Special ability properties
         this.specialAbilityCooldown = 0;
         this.specialAbilityCooldownMax = config.specialAbilityCooldownMax || 3000;
-        this.dashSpeed = config.dashSpeed || this.speed * 3;
+        this.dashSpeed = (config.dashSpeed || this.speed * 1.5) * 2; // 1.5x dash speed as well
         this.shootRange = config.shootRange || TILE_SIZE * 10;
         this.teleportCooldown = 0;
         this.teleportCooldownMax = config.teleportCooldownMax || 5000;
@@ -47,6 +50,35 @@ export default class Enemy extends Character {
         
         // Keep track of active effects
         this.activeEffects = new Map();
+        
+        // Initialize special boss visuals if this is a boss
+        if (this.isBoss) {
+            // Make boss significantly larger
+            this.setScale(config.scale || 2);
+            
+            // Initialize boss visuals with a slight delay to ensure the entity is fully created
+            this.scene.time.delayedCall(100, () => {
+                if (!this.active) return;
+                
+                // Apply boss-specific visuals
+                VisualEffects.createBossAura(this.scene, this, this.bossPhase, this.tintTopLeft);
+                VisualEffects.createBossCrown(this.scene, this);
+                VisualEffects.createBossPhaseParticles(this.scene, this, this.bossPhase, this.bossType);
+                VisualEffects.createBossHealthBar(this.scene, this);
+                
+                // Create dramatic entry effect
+                this.scene.cameras.main.shake(300, 0.01);
+                this.scene.tweens.add({
+                    targets: this,
+                    scale: { from: this.scale * 1.5, to: this.scale },
+                    alpha: { from: 0.2, to: 1 },
+                    duration: 800,
+                    ease: 'Bounce.easeOut'
+                });
+            });
+        }
+        
+        console.log(`Enemy created: type=${this.enemyType}, speed=${this.speed} (1.5x original speed)`);
     }
     
     /**
@@ -218,17 +250,15 @@ export default class Enemy extends Character {
         explosion.fillStyle(0xFF0000, 0.7);
         explosion.fillCircle(this.x, this.y, explosionRadius);
         
-        // Add particles
-        const particles = this.scene.add.particles(this.x, this.y, 'particle', {
-            speed: { min: 50, max: 200 },
-            scale: { start: 1, end: 0 },
-            lifespan: 800,
-            quantity: 30,
-            tint: [0xFF0000, 0xFF5500, 0xFFAA00],
-            blendMode: 'ADD',
-            emitting: false
-        });
-        particles.explode(30);
+        // Add particles using VisualEffects utility
+        VisualEffects.createDamageParticles(
+            this.scene,
+            this.x,
+            this.y,
+            [0xFF0000, 0xFF5500, 0xFFAA00],
+            30,
+            false
+        );
         
         // Damage player and followers if in range
         const player = this.scene.player;
@@ -253,9 +283,6 @@ export default class Enemy extends Character {
             duration: 500,
             onComplete: () => {
                 explosion.destroy();
-                this.scene.time.delayedCall(800, () => {
-                    if (particles && particles.active) particles.destroy();
-                });
             }
         });
         
@@ -318,18 +345,15 @@ export default class Enemy extends Character {
         const dirX = Math.cos(angle);
         const dirY = Math.sin(angle);
         
-        // Create the projectile using combat system
-        const projectile = combatSystem.shootProjectile(this.x, this.y, dirX, dirY, 'bullet');
+        // Instead of manually creating and configuring a projectile
+        // Use the factory method to create an enemy projectile
+        const projectile = Projectile.createEnemyProjectile(
+            this.scene, this.x, this.y, dirX, dirY, this.attackDamage
+        );
         
         if (projectile) {
-            // Set properties
-            projectile.setTint(0xFF0000);
-            projectile.damage = this.attackDamage;
-            projectile.isEnemyProjectile = true; // Flag for collision handling
-            
-            // Explicitly ensure the projectile is fired with velocity
-            projectile.setSpeed(120); // Slightly faster than before
-            projectile.fire(dirX, dirY); // Call fire again to guarantee velocity is set
+            // Add to bullets group
+            this.scene.bullets.add(projectile);
             
             // Add a lifespan to ensure cleanup
             projectile.setLifespan(5000); // 5 seconds max lifetime
@@ -438,18 +462,18 @@ export default class Enemy extends Character {
         const dirX = Math.cos(angle);
         const dirY = Math.sin(angle);
         
-        // Create special projectile
-        const projectile = combatSystem.shootProjectile(this.x, this.y, dirX, dirY, 'bullet');
+        // Use the factory method to create an enemy projectile
+        const projectile = Projectile.createEnemyProjectile(
+            this.scene, this.x, this.y, dirX, dirY, this.attackDamage
+        );
+        
         if (projectile) {
-            // Set properties
-            projectile.setTint(0xA020F0); // Purple for magic
-            projectile.damage = this.attackDamage;
-            projectile.isEnemyProjectile = true;
-            projectile.setScale(1.5); // Larger projectile
+            // Add to bullets group
+            this.scene.bullets.add(projectile);
             
-            // Explicitly ensure the projectile is fired with velocity
-            projectile.setSpeed(100); // Magic spell speed
-            projectile.fire(dirX, dirY); // Call fire again to guarantee velocity is set
+            // Set magic-specific properties
+            projectile.setTint(0xA020F0); // Purple for magic
+            projectile.setScale(1.5); // Larger projectile
             
             // Add a lifespan to ensure cleanup
             projectile.setLifespan(5000); // 5 seconds max lifetime
@@ -513,23 +537,87 @@ export default class Enemy extends Character {
         // Visual feedback for phase change
         this.scene.cameras.main.shake(300, 0.01);
         
+        // Create intense flash effect around boss
+        VisualEffects.createFlashEffect(
+            this.scene, 
+            this.x, 
+            this.y, 
+            this.width * 2, 
+            this.height * 2, 
+            0xFFFFFF, 
+            0.8, 
+            400
+        );
+        
+        // Enhanced visual feedback for phase transition
         const flashTween = this.scene.tweens.add({
             targets: this,
             alpha: 0.4,
-            scale: 1.2,
+            scale: this.scale * 1.2,
             duration: 200,
             yoyo: true,
             repeat: 3,
             onComplete: () => {
                 if (!this.active) return;
                 this.setAlpha(1);
-                this.setScale(1);
+                
+                // Update visuals for new phase
+                if (this.auraContainer) {
+                    this.auraContainer.destroy();
+                    VisualEffects.createBossAura(this.scene, this, this.bossPhase, this.tintTopLeft);
+                }
+                
+                if (this.phaseEmitter) {
+                    this.phaseEmitter.destroy();
+                    VisualEffects.createBossPhaseParticles(this.scene, this, this.bossPhase, this.bossType);
+                }
+                
+                // Create explosive particle burst to mark phase change
+                VisualEffects.createDeathEffect(this.scene, this.x, this.y, this.tintTopLeft, 30);
+                
+                // Play phase transition sound if audio manager exists
+                if (this.scene.audioManager) {
+                    this.scene.audioManager.playSFX('boss_phase_change');
+                }
+                
+                // Scale back to normal size but slightly larger than before
+                this.setScale(this.scale * 1.1);
                 
                 // Reduce cooldowns and increase damage for later phases
                 this.specialAbilityCooldownMax *= 0.7;
                 this.teleportCooldownMax *= 0.7;
                 this.attackDamage = Math.floor(this.attackDamage * 1.5);
                 this.speed *= 1.2;
+                
+                // Add temporary invulnerability
+                this.isInvulnerable = true;
+                this.scene.time.delayedCall(1000, () => {
+                    if (this.active) this.isInvulnerable = false;
+                });
+                
+                // Show phase change text
+                const phaseText = this.scene.add.text(
+                    this.x,
+                    this.y - this.height,
+                    `PHASE ${this.bossPhase}!`,
+                    {
+                        fontSize: '24px',
+                        fontFamily: 'Arial',
+                        color: '#FF0000',
+                        stroke: '#000000',
+                        strokeThickness: 4
+                    }
+                ).setOrigin(0.5).setDepth(1000);
+                
+                // Animate and remove the text
+                this.scene.tweens.add({
+                    targets: phaseText,
+                    y: phaseText.y - 50,
+                    alpha: 0,
+                    duration: 1500,
+                    ease: 'Power1',
+                    onComplete: () => phaseText.destroy()
+                });
             }
         });
     }
@@ -670,6 +758,33 @@ export default class Enemy extends Character {
             this.scene.addExperience(this.experienceValue);
         }
         
+        // Track enemy kill in SpawnSystem ONLY if not already counted in damage()
+        // Check for special property that indicates this enemy was already counted
+        if (this.scene.spawnSystem && !this._killCounted) {
+            // Directly increment the kill counter in SpawnSystem
+            if (this.scene.spawnSystem.waveActive) {
+                this.scene.spawnSystem.enemiesKilledInWave++;
+                
+                // Force UI update with accurate killed count
+                if (this.scene.uiManager) {
+                    // Always update the UI with the latest count
+                    this.scene.uiManager.updateWaveInfo(
+                        this.scene.spawnSystem.currentWave,
+                        this.scene.spawnSystem.totalWaves,
+                        this.scene.spawnSystem.enemiesRemainingInWave,
+                        this.scene.spawnSystem.totalEnemies,
+                        this.scene.spawnSystem.enemiesSpawnedInWave,
+                        this.scene.spawnSystem.enemiesKilledInWave
+                    );
+                }
+                
+                // Log debug info
+                console.log(`[Enemy.die] Enemy kill counted in die(). Type: ${this.enemyType}, Kill count now: ${this.scene.spawnSystem.enemiesKilledInWave}`);
+            }
+        } else {
+            console.log(`[Enemy.die] Enemy kill was already counted in damage(). Type: ${this.enemyType}`);
+        }
+        
         // Create death effect and destroy
         this.createDeathEffect();
         this.destroy();
@@ -716,7 +831,7 @@ export default class Enemy extends Character {
             }
         }
         
-        // Base configuration for level scaling
+        // Base configuration for level scaling - speed is multiplied by 1.5 in constructor
         const baseSpeed = 40 + (level * 2);
         const baseHealth = 1 + Math.floor(level / 3);
         
@@ -724,7 +839,7 @@ export default class Enemy extends Character {
         let config = {
             enemyType: type,
             health: baseHealth,
-            speed: baseSpeed,
+            speed: baseSpeed, // Will be multiplied by 1.5 in constructor
             attackDamage: 1,
             scoreValue: baseHealth * 5,
             experienceValue: baseHealth * 2,
@@ -826,11 +941,102 @@ export default class Enemy extends Character {
         config.scoreValue = config.health * 5;
         config.experienceValue = config.health * 3;
         config.specialAbilityCooldownMax = 5000;
-        config.scale = 1.5; // Bosses are larger
+        config.scale = 2.2; // Make bosses even larger and more imposing
         
         const boss = new Enemy(scene, x, y, config);
-        boss.setScale(1.5);
+        
+        // Add screen shake and boss warning text
+        scene.cameras.main.shake(500, 0.02);
+        
+        // Create a large warning text
+        const bossNames = {
+            'summoner': 'Summoner',
+            'berserker': 'Berserker',
+            'alchemist': 'Mad Alchemist',
+            'lichking': 'Lich King'
+        };
+        const bossName = bossNames[bossType] || 'Boss';
+        const warningText = scene.add.text(
+            scene.cameras.main.worldView.centerX,
+            scene.cameras.main.worldView.centerY,
+            `${bossName} HAS APPEARED!`,
+            {
+                fontSize: '36px',
+                fontFamily: 'Arial',
+                color: '#FF0000',
+                stroke: '#000000',
+                strokeThickness: 6,
+                align: 'center'
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+        
+        // Animate and remove the warning text
+        scene.tweens.add({
+            targets: warningText,
+            alpha: { from: 0, to: 1 },
+            scale: { from: 2, to: 1 },
+            duration: 1000,
+            ease: 'Bounce.easeOut',
+            yoyo: true,
+            hold: 1000,
+            onComplete: () => warningText.destroy()
+        });
+        
+        // Play boss spawn sound if audio manager exists
+        if (scene.audioManager) {
+            scene.audioManager.playSFX('boss_spawn');
+        }
         
         return boss;
+    }
+
+    /**
+     * Override the damage method to handle boss invulnerability and update visuals
+     * @param {number} amount - Amount of damage to apply
+     */
+    damage(amount) {
+        // Prevent damage if invulnerable
+        if (this.isInvulnerable) return;
+        
+        // Store previous health to detect boss phase transitions
+        const previousHealth = this.health;
+        
+        // Call parent damage method (or implement directly if no parent method exists)
+        if (typeof super.damage === 'function') {
+            super.damage(amount);
+        } else {
+            this.health = Math.max(0, this.health - amount);
+            
+            // Create visual feedback
+            VisualEffects.createEntityFlashEffect(this.scene, this, 0.7, 100, 1);
+            VisualEffects.createDamageParticles(this.scene, this.x, this.y, 0xFFFFFF, 5);
+            
+            // Check if enemy should die
+            if (this.health <= 0) {
+                this.die();
+            }
+        }
+        
+        // Update health bar if this is a boss
+        if (this.isBoss && this.enhancedHealthBar) {
+            this.enhancedHealthBar.update();
+        }
+        
+        // Check for boss phase transition
+        if (this.isBoss) {
+            const previousHealthPercent = previousHealth / this.maxHealth * 100;
+            const currentHealthPercent = this.health / this.maxHealth * 100;
+            
+            // Phase 1 -> 2 transition at 50% health
+            if (previousHealthPercent > 50 && currentHealthPercent <= 50 && this.bossPhase < 2) {
+                this.bossPhase = 2;
+                this.onBossPhaseChange();
+            } 
+            // Phase 2 -> 3 transition at 25% health
+            else if (previousHealthPercent > 25 && currentHealthPercent <= 25 && this.bossPhase < 3) {
+                this.bossPhase = 3;
+                this.onBossPhaseChange();
+            }
+        }
     }
 } 

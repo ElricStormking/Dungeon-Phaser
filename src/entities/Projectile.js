@@ -16,6 +16,7 @@ export default class Projectile extends Phaser.Physics.Arcade.Sprite {
         this.speed = 300;
         this.lifespan = null; // Infinite by default
         this.type = texture;
+        this.isEnemyProjectile = false; // Default to player projectile
         
         // Special properties
         this.isPiercing = false;
@@ -26,61 +27,143 @@ export default class Projectile extends Phaser.Physics.Arcade.Sprite {
         
         // Set depth
         this.setDepth(5);
+        
+        // Debug: Log creation of this projectile
+        console.log(`Projectile created: ${texture} at ${x},${y}`);
     }
     
     /**
-     * Fire the projectile in a direction
-     * @param {number} dirX - X direction component (normalized)
-     * @param {number} dirY - Y direction component (normalized)
+     * Set the projectile as an enemy projectile (for proper collision detection)
      */
-    fire(dirX, dirY) {
-        if (!this.active) return;
+    setAsEnemyProjectile() {
+        this.isEnemyProjectile = true;
         
-        // Set velocity based on direction and speed
-        this.body.velocity.x = dirX * this.speed;
-        this.body.velocity.y = dirY * this.speed;
+        // Make enemy projectiles visually distinct
+        this.setTint(0xFF0000); // Red tint
+        this.setScale(1.2); // Slightly larger
         
-        // Set rotation to match direction
-        this.rotation = Math.atan2(dirY, dirX);
+        // Create a glow effect in the scene instead of trying to add it to the sprite
+        const glow = this.scene.add.graphics();
+        glow.fillStyle(0xFF0000, 0.3);
+        glow.fillCircle(this.x, this.y, this.width * 0.7);
+        
+        // Make the glow follow the projectile
+        this.scene.tweens.add({
+            targets: glow,
+            duration: 5000, // Match the typical lifespan
+            onUpdate: () => {
+                if (this.active) {
+                    glow.clear();
+                    glow.fillStyle(0xFF0000, 0.3);
+                    glow.fillCircle(this.x, this.y, this.width * 0.7);
+                }
+            },
+            onComplete: () => {
+                glow.destroy();
+            }
+        });
+        
+        // Destroy glow when projectile is destroyed
+        this.on('destroy', () => {
+            if (glow && !glow.destroyed) {
+                glow.destroy();
+            }
+        });
+        
+        // Debug: Log when a projectile is set as enemy
+        console.log(`Projectile set as ENEMY projectile: ${this.type}`);
         
         return this;
     }
     
     /**
-     * Update method called by physics group
+     * Set damage value
+     * @param {number} amount - Amount of damage
      */
-    update(time, delta) {
-        if (!this.active) return;
-        
-        // Check if out of bounds
-        if (this.isOutOfBounds()) {
-            this.destroy();
-            return;
-        }
-        
-        // Update lifespan if set
-        if (this.lifespan !== null) {
-            this.lifespan -= delta;
-            if (this.lifespan <= 0) {
-                this.destroy();
-                return;
-            }
-        }
+    setDamage(amount) {
+        this.damage = amount;
+        return this;
     }
     
     /**
-     * Check if the projectile is out of the world bounds
+     * Set the velocity directly
      */
-    isOutOfBounds() {
-        const buffer = 50;
-        const bounds = this.scene.physics.world.bounds;
+    setSpeed(speed) {
+        this.speed = speed;
+        return this;
+    }
+    
+    /**
+     * Fire the projectile in a direction
+     * @param {number} dirX - X direction
+     * @param {number} dirY - Y direction
+     */
+    fire(dirX, dirY) {
+        // Avoid division by zero and ensure we have a direction
+        const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+        let normalizedDirX = 0;
+        let normalizedDirY = 0;
         
-        return (
-            this.x < bounds.x - buffer ||
-            this.x > bounds.x + bounds.width + buffer ||
-            this.y < bounds.y - buffer ||
-            this.y > bounds.y + bounds.height + buffer
-        );
+        if (magnitude > 0.001) {  // Avoid extremely small values
+            normalizedDirX = dirX / magnitude;
+            normalizedDirY = dirY / magnitude;
+        } else {
+            // Default direction if none provided
+            normalizedDirX = 1;
+            normalizedDirY = 0;
+            console.warn("Projectile fired with near-zero direction vector, using default direction");
+        }
+        
+        // Ensure the body exists before setting velocity
+        if (this.body) {
+            // Set velocity - use a minimum velocity to ensure movement
+            this.body.velocity.x = normalizedDirX * this.speed;
+            this.body.velocity.y = normalizedDirY * this.speed;
+            
+            // Verify velocity was set (debug info)
+            if (Math.abs(this.body.velocity.x) < 0.1 && Math.abs(this.body.velocity.y) < 0.1) {
+                console.error("Failed to set projectile velocity! Values too small.", {
+                    dirX, dirY, normalizedDirX, normalizedDirY, speed: this.speed
+                });
+                
+                // Fallback: force a minimum velocity in the original direction
+                if (Math.abs(dirX) > Math.abs(dirY)) {
+                    this.body.velocity.x = dirX > 0 ? 100 : -100;
+                } else {
+                    this.body.velocity.y = dirY > 0 ? 100 : -100;
+                }
+            }
+            
+            // Extra protection - if still no movement, use a default velocity
+            if (this.body.velocity.x === 0 && this.body.velocity.y === 0) {
+                console.warn("Zero velocity detected after setting, using fallback velocity");
+                this.body.velocity.x = 100;
+            }
+        } else {
+            console.error("Projectile body not initialized when firing!");
+        }
+        
+        // Set rotation
+        this.rotation = Math.atan2(normalizedDirY, normalizedDirX);
+        
+        // Debug logs for velocity
+        console.log(`Projectile fired: type=${this.type}, isEnemy=${this.isEnemyProjectile}, velocity=(${this.body?.velocity.x}, ${this.body?.velocity.y}), position=(${this.x}, ${this.y})`);
+        
+        return this;
+    }
+    
+    /**
+     * Set a lifespan for automatic cleanup
+     * @param {number} duration - Time in ms before auto-destroy
+     */
+    setLifespan(duration) {
+        this.lifespan = duration;
+        this.scene.time.delayedCall(duration, () => {
+            if (this.active) {
+                this.destroy();
+            }
+        });
+        return this;
     }
     
     /**
@@ -96,56 +179,21 @@ export default class Projectile extends Phaser.Physics.Arcade.Sprite {
     }
     
     /**
-     * Configure the projectile as a sniper shot (high damage, targeted)
-     * @param {Phaser.GameObjects.Sprite} target - Target enemy
+     * Update method called each frame
+     * @param {number} time - The current time
+     * @param {number} delta - The delta time in ms since the last frame
      */
-    setSniper(target) {
-        this.isSniper = true;
-        this.target = target;
-        return this;
-    }
-    
-    /**
-     * Set the projectile's damage value
-     * @param {number} value - Damage value
-     */
-    setDamage(value) {
-        this.damage = value;
-        return this;
-    }
-    
-    /**
-     * Set the projectile's speed
-     * @param {number} value - Speed value
-     */
-    setSpeed(value) {
-        this.speed = value;
+    preUpdate(time, delta) {
+        super.preUpdate(time, delta);
         
-        // If the projectile is already moving, update its velocity
-        if (this.body && (this.body.velocity.x !== 0 || this.body.velocity.y !== 0)) {
-            const currentAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
-            this.body.velocity.x = Math.cos(currentAngle) * value;
-            this.body.velocity.y = Math.sin(currentAngle) * value;
+        // Check for out-of-bounds and clean up
+        const padding = TILE_SIZE * 2;
+        const bounds = this.scene.physics.world.bounds;
+        
+        if (this.x < bounds.x - padding || this.x > bounds.width + padding ||
+            this.y < bounds.y - padding || this.y > bounds.height + padding) {
+            this.destroy();
         }
-        
-        return this;
-    }
-    
-    /**
-     * Set the projectile's lifespan
-     * @param {number} value - Lifespan in ms
-     */
-    setLifespan(value) {
-        this.lifespan = value;
-        return this;
-    }
-    
-    /**
-     * Add a freeze effect to the projectile
-     */
-    addFreezeEffect() {
-        this.freezeEffect = true;
-        return this;
     }
     
     /**
@@ -161,65 +209,138 @@ export default class Projectile extends Phaser.Physics.Arcade.Sprite {
      */
     static createArrow(scene, x, y, dirX, dirY) {
         const arrow = new Projectile(scene, x, y, 'arrow');
-        arrow.setDamage(3);
-        arrow.setSpeed(400); // Increased default speed
-        arrow.setScale(1.2); // Make arrow slightly larger
+        arrow.setDamage(2);
+        arrow.setSpeed(400);
         
-        // Create particle trail with updated Phaser 3.60 syntax
-        const particles = scene.add.particles(x, y, 'particle', {
-            speed: 20, // Faster particles
-            scale: { start: 0.3, end: 0 }, // Larger particles
-            blendMode: 'ADD',
-            lifespan: 200,
-            tint: 0x00FF00,
-            follow: arrow,
-            quantity: 2, // More particles
-            frequency: 20
-        });
-        
-        arrow.on('destroy', () => {
-            if (particles) {
-                particles.stop();
-                scene.time.delayedCall(200, () => {
-                    if (particles) particles.destroy();
-                });
-            }
-        });
-        
-        // Make sure to initialize the arrow velocity
         return arrow.fire(dirX, dirY);
     }
     
     /**
-     * Factory method to create a frost bolt
+     * Factory method to create a frost bolt projectile with enhanced visuals
      */
     static createFrostBolt(scene, x, y, dirX, dirY) {
-        const bolt = new Projectile(scene, x, y, 'bullet');
-        bolt.setTint(0x00FFFF);
-        bolt.addFreezeEffect();
+        const frost = new Projectile(scene, x, y, 'bullet');
+        frost.setTint(0x00FFFF);  // Cyan/bright blue color
+        frost.setDamage(1);
+        frost.freezeEffect = true;
+        frost.setSpeed(350);
         
-        // Create particle trail with updated Phaser 3.60 syntax
-        const particles = scene.add.particles(x, y, 'particle', {
-            speed: 20,
-            scale: { start: 0.3, end: 0 },
-            blendMode: 'ADD',
-            lifespan: 300,
-            tint: 0x00FFFF,
-            follow: bolt,
-            quantity: 1,
-            frequency: 10
-        });
+        // Make the frost bolt larger and more noticeable
+        frost.setScale(2.0);
         
-        bolt.on('destroy', () => {
-            if (particles) {
-                particles.stop();
-                scene.time.delayedCall(300, () => {
-                    if (particles) particles.destroy();
-                });
+        // Add a bright inner glow
+        const glow = scene.add.graphics();
+        glow.fillStyle(0x00FFFF, 0.6);  // Bright cyan glow
+        glow.fillCircle(frost.x, frost.y, frost.width * 0.8);
+        
+        // Make the glow follow the projectile with a pulse effect
+        scene.tweens.add({
+            targets: glow,
+            alpha: { from: 0.7, to: 0.3 },
+            scale: { from: 0.8, to: 1.2 },
+            duration: 400,
+            yoyo: true,
+            repeat: -1,
+            onUpdate: () => {
+                if (frost.active) {
+                    glow.clear();
+                    glow.fillStyle(0x00FFFF, 0.6);
+                    glow.fillCircle(frost.x, frost.y, frost.width * 0.8);
+                }
+            },
+            onComplete: () => {
+                glow.destroy();
             }
         });
         
-        return bolt.fire(dirX, dirY);
+        // Create enhanced particle effects with updated Phaser 3.60 syntax
+        const particles = scene.add.particles(x, y, 'particle', {
+            speed: 30, 
+            scale: { start: 0.6, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 400, 
+            tint: [0x00FFFF, 0xAAFFFF],  // Mix of cyan and light blue
+            follow: frost,
+            quantity: 4,  // More particles
+            frequency: 10,  // Emit more frequently
+            angle: { min: 0, max: 360 },  // Emit in all directions
+            alpha: { start: 0.8, end: 0 },
+            scale: { start: 0.6, end: 0.1 }
+        });
+        
+        // Add a trail of icy particles behind the projectile
+        const trail = scene.add.particles(x, y, 'particle', {
+            speed: 10,
+            scale: { start: 0.3, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 500,
+            tint: 0xAAFFFF,  // Light blue
+            follow: frost,
+            followOffset: { x: -frost.width, y: 0 },
+            quantity: 1,
+            frequency: 15,
+            alpha: { start: 0.6, end: 0 }
+        });
+        
+        // Add snowflake-like particles that float down
+        const snowflakes = scene.add.particles(x, y, 'particle', {
+            speed: { min: 5, max: 15 },
+            scale: { start: 0.2, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 300,
+            tint: 0xFFFFFF,  // White
+            follow: frost,
+            quantity: 1,
+            frequency: 30,
+            angle: { min: 80, max: 100 },  // Mostly downward
+            gravityY: 20  // Slight gravity effect
+        });
+        
+        // Clean up all particle effects when projectile is destroyed
+        frost.on('destroy', () => {
+            if (glow && !glow.destroyed) {
+                glow.destroy();
+            }
+            
+            if (particles) {
+                particles.stop();
+                scene.time.delayedCall(500, () => {
+                    if (particles) particles.destroy();
+                });
+            }
+            
+            if (trail) {
+                trail.stop();
+                scene.time.delayedCall(500, () => {
+                    if (trail) trail.destroy();
+                });
+            }
+            
+            if (snowflakes) {
+                snowflakes.stop();
+                scene.time.delayedCall(300, () => {
+                    if (snowflakes) snowflakes.destroy();
+                });
+            }
+            
+            // Create a frost explosion effect on impact
+            const impactExplosion = scene.add.particles(frost.x, frost.y, 'particle', {
+                speed: { min: 30, max: 60 },
+                scale: { start: 0.8, end: 0 },
+                blendMode: 'ADD',
+                lifespan: 400,
+                tint: [0x00FFFF, 0xAAFFFF, 0xFFFFFF],
+                quantity: 15,
+                angle: { min: 0, max: 360 }
+            });
+            
+            // Auto-destroy the impact explosion after animation completes
+            scene.time.delayedCall(400, () => {
+                if (impactExplosion) impactExplosion.destroy();
+            });
+        });
+        
+        return frost.fire(dirX, dirY);
     }
     
     /**
@@ -252,6 +373,44 @@ export default class Projectile extends Phaser.Physics.Arcade.Sprite {
             }
         });
         
+        return projectile.fire(dirX, dirY);
+    }
+    
+    /**
+     * Factory method to create an enemy projectile
+     */
+    static createEnemyProjectile(scene, x, y, dirX, dirY, damage = 1) {
+        const projectile = new Projectile(scene, x, y, 'bullet');
+        projectile.setDamage(damage);
+        
+        // Set the speed before firing to ensure proper velocity
+        projectile.setSpeed(150); // Slightly faster so enemy bullets are more challenging
+        
+        // Set as enemy projectile
+        projectile.setAsEnemyProjectile();
+        
+        // Add a particle trail for better visibility
+        const particles = scene.add.particles(x, y, 'particle', {
+            speed: 10,
+            scale: { start: 0.2, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 200,
+            tint: 0xFF0000,
+            follow: projectile,
+            quantity: 1,
+            frequency: 30
+        });
+        
+        projectile.on('destroy', () => {
+            if (particles) {
+                particles.stop();
+                scene.time.delayedCall(200, () => {
+                    if (particles) particles.destroy();
+                });
+            }
+        });
+        
+        // Fire the projectile and return it
         return projectile.fire(dirX, dirY);
     }
 } 

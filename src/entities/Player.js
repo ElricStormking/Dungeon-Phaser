@@ -1,6 +1,7 @@
 import Character from './Character.js';
 import { TILE_SIZE } from '../constants.js';
 import Projectile from './Projectile.js';
+import * as VisualEffects from '../utils/VisualEffects.js';
 
 /**
  * Player class representing the snake's head
@@ -14,7 +15,7 @@ export default class Player extends Character {
             maxHealth: 50,
             direction: 'right',
             tint: 0xFFFFFF, // No tint needed for sprite sheet
-            bodySize: { width: 36, height: 36 } // Larger hitbox for bigger sprite
+            bodySize: { width: 32, height: 32 } // Smaller hitbox for better collision
         });
         
         // Hero class and abilities
@@ -30,17 +31,35 @@ export default class Player extends Character {
         this.setDepth(10);
         
         // Scale the sprite to match the game's TILE_SIZE
-        // With TILE_SIZE=48 and sprite size=32, we scale up by 1.5
-        this.setScale(1.5);
+        // With TILE_SIZE=48 and sprite size=96, we use 0.5 scale
+        this.setScale(0.5);
+        
+        // Adjust physics body size and offset
+        this.body.setSize(32, 32);
+        this.body.setOffset(32, 48); // Offset to match visual appearance
         
         // Set the sprite's origin to center for better positioning
         this.setOrigin(0.5, 0.5);
         
+        // Animation tracking
+        this._animationRetryAttempted = false;
+        
         // Create animations if they don't exist yet
         this.createAnimations();
         
-        // Start with default animation
-        this.play('warrior-down-idle');
+        // Start with default animation - with error handling
+        try {
+            if (scene.anims.exists('walk_down')) {
+                this.play('walk_down');
+                console.log('Playing initial walk_down animation');
+            } else {
+                console.warn('Initial walk_down animation not available, using static frame');
+                this.setFrame(0); // Set to first frame as fallback
+            }
+        } catch (error) {
+            console.error('Error playing initial animation:', error);
+            this.setFrame(0); // Set to first frame as fallback
+        }
     }
     
     /**
@@ -50,39 +69,65 @@ export default class Player extends Character {
         const scene = this.scene;
         const anims = scene.anims;
         
-        // Only create animations once
-        if (!anims.exists('warrior-down-idle')) {
+        try {
+            console.log('Creating player animations');
+            
+            // Force recreate animations to ensure they use the correct sprite sheet dimensions
+            const animsToCreate = ['walk_down', 'walk_left', 'walk_right', 'walk_up'];
+            
+            // Remove existing animations if they exist (to ensure proper recreation)
+            animsToCreate.forEach(key => {
+                if (anims.exists(key)) {
+                    anims.remove(key);
+                    console.log(`Removed existing animation: ${key}`);
+                }
+            });
+            
             // Down-facing animations (first row - frames 0-3)
             anims.create({
-                key: 'warrior-down-idle',
+                key: 'walk_down',
                 frames: anims.generateFrameNumbers('warrior', { start: 0, end: 3 }),
-                frameRate: 5,
+                frameRate: 6,
                 repeat: -1
             });
             
-            // Side-facing animations (second row - frames 4-7)
+            // Left-facing animations (second row - frames 4-7)
             anims.create({
-                key: 'warrior-side-idle',
+                key: 'walk_left',
                 frames: anims.generateFrameNumbers('warrior', { start: 4, end: 7 }),
-                frameRate: 5,
+                frameRate: 6,
                 repeat: -1
             });
             
-            // Up-facing animations (third row - frames 8-11)
+            // Right-facing animations (third row - frames 8-11)
             anims.create({
-                key: 'warrior-up-idle',
+                key: 'walk_right',
                 frames: anims.generateFrameNumbers('warrior', { start: 8, end: 11 }),
-                frameRate: 5,
+                frameRate: 6,
                 repeat: -1
             });
             
-            // Back-facing animations (fourth row - frames 12-15)
+            // Up-facing animations (fourth row - frames 12-15)
             anims.create({
-                key: 'warrior-back-idle',
+                key: 'walk_up',
                 frames: anims.generateFrameNumbers('warrior', { start: 12, end: 15 }),
-                frameRate: 5,
+                frameRate: 6,
                 repeat: -1
             });
+            
+            console.log('Player animations created successfully');
+            
+            // Verify animations were created
+            animsToCreate.forEach(key => {
+                if (anims.exists(key)) {
+                    console.log(`Animation verified: ${key}`);
+                } else {
+                    console.error(`Failed to create animation: ${key}`);
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error creating player animations:', error);
         }
     }
     
@@ -95,55 +140,8 @@ export default class Player extends Character {
         
         this.isInvulnerable = true;
         
-        // Enhanced visual effect for damage
-        // 1. Create a red flash overlay
-        const flashRect = this.scene.add.rectangle(
-            this.x, 
-            this.y, 
-            this.width * 1.5, 
-            this.height * 1.5, 
-            0xff0000, 
-            0.7
-        ).setDepth(this.depth + 1);
-        
-        // Flash and remove the overlay
-        this.scene.tweens.add({
-            targets: flashRect,
-            alpha: 0,
-            duration: 200,
-            onComplete: () => flashRect.destroy()
-        });
-        
-        // 2. Create damage particles
-        const emitter = this.scene.add.particles(this.x, this.y, 'particle', {
-            speed: { min: 30, max: 80 },
-            angle: { min: 0, max: 360 },
-            scale: { start: 0.5, end: 0 },
-            lifespan: { min: 300, max: 500 },
-            quantity: 10,
-            tint: 0xff0000,
-            emitting: false
-        });
-        
-        emitter.explode(10);
-        this.scene.time.delayedCall(500, () => {
-            if (emitter && emitter.active) emitter.destroy();
-        });
-        
-        // 3. Improved player flashing - more intense and longer lasting
-        this.scene.tweens.add({
-            targets: this,
-            alpha: 0.3,
-            duration: 100,
-            yoyo: true,
-            repeat: 9, // Increased repeat count for longer flashing
-            onComplete: () => {
-                if (this.active) this.setAlpha(1);
-            }
-        });
-        
-        // 4. Camera shake effect
-        this.scene.cameras.main.shake(200, 0.005);
+        // Use the centralized effect function
+        VisualEffects.createInvulnerabilityEffect(this.scene, this, duration);
         
         // Reset invulnerability after duration
         this.scene.time.delayedCall(duration, () => {
@@ -522,25 +520,71 @@ export default class Player extends Character {
         }
         
         // Update animation based on movement direction
-        // For this warrior sprite, we use the direction property directly
-        // rather than body velocity since the grid movement doesn't use physics velocity
-        
         if (this.direction) {
+            // Define animation based on direction
+            let animKey;
+            let flipX = false;
+            
             switch (this.direction) {
                 case 'up':
-                    this.play('warrior-up-idle', true);
+                    animKey = 'walk_up';
                     break;
                 case 'down':
-                    this.play('warrior-down-idle', true);
+                    animKey = 'walk_down';
                     break;
                 case 'left':
-                    this.setFlipX(true);
-                    this.play('warrior-side-idle', true);
+                    animKey = 'walk_left';
+                    flipX = true;
                     break;
                 case 'right':
-                    this.setFlipX(false);
-                    this.play('warrior-side-idle', true);
+                    animKey = 'walk_right';
+                    flipX = false;
                     break;
+                default:
+                    animKey = 'walk_down';
+            }
+            
+            // Set horizontal flip
+            this.setFlipX(flipX);
+            
+            // Try to play the animation with error handling
+            try {
+                // Check if animation exists before playing
+                if (this.scene.anims.exists(animKey)) {
+                    // Only change animation if it's different or not playing
+                    if (!this.anims.isPlaying || this.anims.currentAnim.key !== animKey) {
+                        this.play(animKey, true);
+                    }
+                } else {
+                    // If animation doesn't exist, try to recreate animations
+                    if (!this._animationRetryAttempted) {
+                        console.warn(`Animation ${animKey} not found, recreating animations`);
+                        this.createAnimations();
+                        this._animationRetryAttempted = true;
+                        
+                        // Try one more time after recreation
+                        if (this.scene.anims.exists(animKey)) {
+                            this.play(animKey, true);
+                        } else {
+                            // Set a static frame as fallback if animation still doesn't exist
+                            console.error(`Animation ${animKey} still not available after recreation`);
+                            this.setFrame(this.direction === 'left' ? 4 : 
+                                         this.direction === 'right' ? 8 : 
+                                         this.direction === 'up' ? 12 : 0);
+                        }
+                    } else {
+                        // Use static frame as fallback if already attempted recreation
+                        this.setFrame(this.direction === 'left' ? 4 : 
+                                     this.direction === 'right' ? 8 : 
+                                     this.direction === 'up' ? 12 : 0);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error playing animation ${animKey}:`, error);
+                // Fallback to static frame on error
+                this.setFrame(this.direction === 'left' ? 4 : 
+                             this.direction === 'right' ? 8 : 
+                             this.direction === 'up' ? 12 : 0);
             }
         }
     }

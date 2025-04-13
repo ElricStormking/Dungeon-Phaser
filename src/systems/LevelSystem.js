@@ -32,7 +32,7 @@ export default class LevelSystem {
         
         // Level Text - center of UI bar
         this.levelText = this.scene.add.text(
-            GAME_WIDTH / 2, 
+            GAME_WIDTH / 2 + 200, // Move 200 pixels to the right
             UI_PADDING + 10, 
             'Level: 1', 
             style
@@ -43,7 +43,7 @@ export default class LevelSystem {
         
         // Experience Bar Background - below the UI panel
         this.scene.add.rectangle(
-            GAME_WIDTH / 2, 
+            GAME_WIDTH / 2 + 200, // Move to match level text
             80, 
             GAME_WIDTH - 40, 
             12, 
@@ -54,7 +54,7 @@ export default class LevelSystem {
         
         // Experience Bar Fill
         this.experienceBar = this.scene.add.rectangle(
-            20, 
+            20 + 200, // Adjust starting position
             80, 
             0, 
             8, 

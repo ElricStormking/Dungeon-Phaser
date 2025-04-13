@@ -1,4 +1,5 @@
 import { TILE_SIZE } from '../constants.js';
+import * as VisualEffects from '../utils/VisualEffects.js';
 
 /**
  * Base Character class that all game characters will extend
@@ -34,8 +35,16 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
             this.setTint(config.tint);
         }
         
-        // Create health bar on creation
-        this.updateHealthBar();
+        // Special setup for player character (warrior)
+        if (texture === 'warrior') {
+            // Use special player health bar setup that updates every frame
+            this.scene.time.delayedCall(100, () => {
+                this.setupPlayerHealthBar();
+            });
+        } else {
+            // Create standard health bar for non-player characters
+            this.updateHealthBar();
+        }
         
         // Event for cleanup
         this.on('destroy', this.onDestroy, this);
@@ -68,49 +77,67 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
         }
         
         // Damage flash effect - more dramatic for player
-        this.scene.tweens.add({
-            targets: this,
-            alpha: isPlayer ? 0.3 : 0.5,
-            duration: 100,
-            yoyo: true,
-            repeat: isPlayer ? 1 : 0,
-            onComplete: () => { if(this.active) this.setAlpha(1); }
-        });
+        VisualEffects.createEntityFlashEffect(
+            this.scene,
+            this,
+            isPlayer ? 0.3 : 0.5,
+            100,
+            isPlayer ? 1 : 0
+        );
         
         // Create impact effect
         const impactScale = isPlayer ? 1.5 : 1.2;
-        this.scene.tweens.add({
-            targets: this,
-            scaleX: this.scaleX * impactScale,
-            scaleY: this.scaleY * impactScale,
-            duration: 50,
-            yoyo: true,
-            ease: 'Sine.easeOut'
-        });
+        VisualEffects.createImpactScaleEffect(
+            this.scene,
+            this, 
+            impactScale,
+            50
+        );
         
         // For significant damage (> 20% of max health), add extra effects
         if (amount > this.maxHealth * 0.2) {
             // Create a flash circle at impact point
-            const flash = this.scene.add.circle(
-                this.x, 
-                this.y, 
-                this.width, 
-                0xFF0000, 
-                0.5
+            VisualEffects.createFlashEffect(
+                this.scene,
+                this.x,
+                this.y,
+                this.width,
+                this.width,
+                0xFF0000,
+                0.5,
+                150,
+                this.depth + 1
             );
-            flash.setDepth(this.depth + 1);
-            
-            this.scene.tweens.add({
-                targets: flash,
-                alpha: 0,
-                scale: 1.5,
-                duration: 150,
-                onComplete: () => flash.destroy()
-            });
         }
         
         // Check if died
         if (this.health <= 0) {
+            // CRITICAL FIX: For Enemy deaths from any damage source,
+            // ensure kill is registered before calling die()
+            if (this.constructor.name === 'Enemy' && this.scene.spawnSystem) {
+                // Mark this enemy as killed and update counter
+                if (this.scene.spawnSystem.waveActive) {
+                    this.scene.spawnSystem.enemiesKilledInWave++;
+                    
+                    // Set a flag to prevent double-counting in die()
+                    this._killCounted = true;
+                    
+                    // Force UI update immediately
+                    if (this.scene.uiManager) {
+                        this.scene.uiManager.updateWaveInfo(
+                            this.scene.spawnSystem.currentWave, 
+                            this.scene.spawnSystem.totalWaves,
+                            this.scene.spawnSystem.enemiesRemainingInWave,
+                            this.scene.spawnSystem.totalEnemies,
+                            this.scene.spawnSystem.enemiesSpawnedInWave,
+                            this.scene.spawnSystem.enemiesKilledInWave
+                        );
+                    }
+                    
+                    console.log(`[Character.damage] Enemy killed by damage! Kill count now: ${this.scene.spawnSystem.enemiesKilledInWave}`);
+                }
+            }
+            
             this.die();
             return true;
         }
@@ -131,24 +158,13 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
      * Create explosion effect at character position
      */
     createDeathEffect() {
-        // Can be overridden in subclasses for specific effects
-        const emitter = this.scene.add.particles(this.x, this.y, 'particle', {
-            speed: { min: 50, max: 150 },
-            angle: { min: 0, max: 360 },
-            scale: { start: 0.8, end: 0 },
-            lifespan: { min: 300, max: 500 },
-            quantity: 15,
-            tint: this.tintTopLeft || 0xFFFFFF,
-            blendMode: 'ADD',
-            emitting: false
-        });
-        
-        if (emitter) {
-            emitter.explode(15);
-            this.scene.time.delayedCall(500, () => {
-                if (emitter) emitter.destroy();
-            });
-        }
+        // Using the utility function from VisualEffects.js
+        VisualEffects.createDeathEffect(
+            this.scene,
+            this.x,
+            this.y,
+            this.tintTopLeft || 0xFFFFFF
+        );
     }
     
     /**
@@ -159,45 +175,15 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
         const isSignificant = amount > this.maxHealth * 0.2;
         const isPlayer = this.constructor.name === 'Player';
         
-        // Adjust text size and color based on damage significance and character type
-        const fontSize = isSignificant ? '18px' : (isPlayer ? '16px' : '14px');
-        const textColor = isSignificant ? '#FF0000' : (isPlayer ? '#FFFF00' : '#FFFFFF');
-        
-        // Create the damage text
-        const damageText = this.scene.add.text(this.x, this.y - 15, amount.toString(), {
-            fontSize: fontSize, 
-            fontFamily: 'Arial', 
-            fill: textColor,
-            stroke: '#000000', 
-            strokeThickness: 3,
-            fontStyle: isSignificant ? 'bold' : 'normal'
-        }).setOrigin(0.5).setDepth(this.depth + 2);
-        
-        // Add visual effects to the text
-        const targetY = isSignificant ? damageText.y - 30 : damageText.y - 20;
-        const duration = isSignificant ? 800 : 600;
-        
-        // Apply scale effect for significant damage
-        if (isSignificant) {
-            damageText.setScale(0.5);
-            this.scene.tweens.add({
-                targets: damageText,
-                scale: 1.5,
-                duration: 150,
-                yoyo: true,
-                onComplete: () => damageText.setScale(1)
-            });
-        }
-        
-        // Float and fade animation
-        this.scene.tweens.add({
-            targets: damageText,
-            y: targetY,
-            alpha: 0,
-            duration: duration,
-            ease: 'Power1',
-            onComplete: () => damageText.destroy()
-        });
+        VisualEffects.createDamageText(
+            this.scene,
+            this.x,
+            this.y,
+            amount,
+            isSignificant,
+            isPlayer,
+            this.maxHealth
+        );
     }
     
     /**
@@ -206,35 +192,9 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
     updateHealthBar() {
         if (!this.active || this.health === undefined || this.maxHealth === undefined) return;
         
-        // Create health bar if it doesn't exist
-        if (!this.healthBar) {
-            this.healthBar = this.scene.add.graphics();
-            this.on('destroy', () => { 
-                if (this.healthBar) this.healthBar.destroy(); 
-            });
-        }
-        
-        const healthBar = this.healthBar;
-        healthBar.clear();
-        
-        const barWidth = TILE_SIZE * 0.8;
-        const barHeight = 3;
-        
-        // Position the health bar above the character, adjusted for warrior sprite
-        const yOffset = this.texture.key === 'warrior' ? TILE_SIZE * 0.7 : TILE_SIZE * 0.5;
-        const barX = this.x - barWidth / 2;
-        const barY = this.y - yOffset - barHeight - 1;
-        const healthRatio = Math.max(0, this.health / this.maxHealth);
-        
-        // Background
-        healthBar.fillStyle(0x8B0000, 0.7);
-        healthBar.fillRect(barX, barY, barWidth, barHeight);
-        // Foreground
-        if (healthRatio > 0) {
-            healthBar.fillStyle(0x00FF00, 0.9);
-            healthBar.fillRect(barX, barY, barWidth * healthRatio, barHeight);
-        }
-        healthBar.setDepth(this.depth + 1);
+        // Use the utility function from VisualEffects.js
+        const yOffset = this.texture.key === 'warrior' ? TILE_SIZE * 0.6 : TILE_SIZE * 0.5;
+        VisualEffects.updateHealthBar(this.scene, this, yOffset);
     }
     
     /**
@@ -260,15 +220,49 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
     }
     
     /**
+     * Special function for the player's health bar to ensure it stays attached
+     */
+    setupPlayerHealthBar() {
+        if (this.texture.key !== 'warrior') return; // Only for player
+        
+        // If player health bar already exists, destroy it
+        if (this.healthBar) {
+            this.healthBar.destroy();
+        }
+        
+        // Create a new health bar that will update with the player
+        this.healthBar = this.scene.add.graphics();
+        this.healthBar.setDepth(9999); // Ensure it's above everything
+        
+        // Force update the health bar on every frame
+        this.scene.events.on('update', this.updateHealthBar, this);
+        
+        // Clean up when player is destroyed
+        this.once('destroy', () => {
+            this.scene.events.off('update', this.updateHealthBar, this);
+            if (this.healthBar) {
+                this.healthBar.destroy();
+                this.healthBar = null;
+            }
+        });
+        
+        // Initial update
+        this.updateHealthBar();
+    }
+    
+    /**
      * Update method called every frame
      * @param {number} time - Current time
      * @param {number} delta - Time since last update
      */
     update(time, delta) {
-        // Update health bar position to follow character
-        if (this.healthBar) {
-            this.healthBar.x = this.x;
-            this.healthBar.y = this.y - this.height * 0.7;
+        // Setup player health bar if not already setup
+        if (this.texture.key === 'warrior' && (!this.healthBar || !this.healthBar.active)) {
+            this.setupPlayerHealthBar();
+        }
+        // Update health bar for other characters if active and health exists
+        else if (this.active && this.health !== undefined && this.maxHealth !== undefined) {
+            this.updateHealthBar();
         }
         
         // Don't automatically update angle for sprite sheet animations

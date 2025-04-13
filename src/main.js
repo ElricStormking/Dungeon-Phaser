@@ -5,8 +5,8 @@ import GameScene from './scenes/GameScene.js';
 // Configure the game
 const config = {
     type: Phaser.AUTO,
-    width: GAME_WIDTH * 2,
-    height: GAME_HEIGHT * 2,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
