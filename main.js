@@ -1,9 +1,9 @@
 // Main entry point for Snake Survivors
 // Sets up the Phaser game instance and registers scenes
 
-import TitleScene from '/src/scenes/TitleScene.js';
-import GameScene from '/src/scenes/GameScene.js';
-import { TILE_SIZE } from '/src/constants.js';
+import TitleScene from './src/scenes/TitleScene.js';
+import GameScene from './src/scenes/GameScene.js';
+import { TILE_SIZE } from './src/constants.js';
 
 // Log when modules are loaded for debugging
 console.log('main.js loaded');
@@ -38,7 +38,7 @@ const config = {
     },
     // Set paths for loading assets
     loader: {
-        baseURL: '/',
+        baseURL: '',
         path: ''
     }
 };
