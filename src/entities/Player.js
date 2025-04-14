@@ -31,15 +31,15 @@ export default class Player extends Character {
         this.setDepth(10);
         
         // Scale the sprite to match the game's TILE_SIZE
-        // With TILE_SIZE=48 and sprite size=96, we use 0.5 scale
-        this.setScale(0.5);
+        // With TILE_SIZE=48 and sprite size=96, we use 0.75 scale (1.5x bigger than before)
+        this.setScale(0.75);
         
-        // Adjust physics body size and offset
-        this.body.setSize(32, 32);
-        this.body.setOffset(32, 48); // Offset to match visual appearance
+        // Adjust physics body size and offset for the larger scale (0.75 instead of 0.5)
+        this.body.setSize(48, 48);
+        this.body.setOffset(24, 36); // Offset to match visual appearance
         
         // Set the sprite's origin to center for better positioning
-        this.setOrigin(0.5, 0.5);
+        this.setOrigin(0.5, 0.65);
         
         // Animation tracking
         this._animationRetryAttempted = false;
@@ -534,7 +534,7 @@ export default class Player extends Character {
                     break;
                 case 'left':
                     animKey = 'walk_left';
-                    flipX = true;
+                    flipX = false;
                     break;
                 case 'right':
                     animKey = 'walk_right';
