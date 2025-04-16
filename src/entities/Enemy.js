@@ -515,6 +515,137 @@ export default class Enemy extends Character {
     }
     
     /**
+     * Summoner Boss behavior - summons minions and attacks
+     */
+    updateSummonerBossBehavior() {
+        if (!this.active) return;
+        
+        // Handle summoning cooldown
+        if (!this.summonCooldown) {
+            this.summonCooldown = 0;
+        }
+        
+        // Update cooldown timer
+        if (this.summonCooldown > 0) {
+            this.summonCooldown -= this.scene.game.loop.delta;
+        }
+        
+        // Summon minions if cooldown is ready
+        if (this.summonCooldown <= 0) {
+            this.summonMinions();
+            
+            // Reset cooldown based on boss phase
+            // More frequent summons in later phases
+            switch (this.bossPhase) {
+                case 3:
+                    this.summonCooldown = 5000; // 5 seconds in phase 3
+                    break;
+                case 2:
+                    this.summonCooldown = 8000; // 8 seconds in phase 2
+                    break;
+                default:
+                    this.summonCooldown = 12000; // 12 seconds in phase 1
+                    break;
+            }
+        }
+        
+        // Slow movement when summoning
+        if (this.summonCooldown <= 0) {
+            this.speed = this.originalSpeed * 0.5;
+        } else {
+            // Restore normal speed
+            if (this.originalSpeed) {
+                this.speed = this.originalSpeed;
+            }
+        }
+    }
+    
+    /**
+     * Berserker Boss behavior - dashes and area attacks
+     */
+    updateBerserkerBossBehavior() {
+        if (!this.active) return;
+        
+        // Implement berserker boss behavior
+        // This can be implemented later if needed
+        this.moveTowardPlayer();
+    }
+    
+    /**
+     * Alchemist Boss behavior - teleports and casts area spells
+     */
+    updateAlchemistBossBehavior() {
+        if (!this.active) return;
+        
+        // Implement alchemist boss behavior
+        // This can be implemented later if needed
+        this.moveTowardPlayer();
+    }
+    
+    /**
+     * Lich King Boss behavior - summons minions and casts powerful spells
+     */
+    updateLichKingBossBehavior() {
+        if (!this.active) return;
+        
+        // Implement lich king boss behavior
+        // This can be implemented later if needed
+        this.moveTowardPlayer();
+    }
+    
+    /**
+     * Summon minion enemies around the boss
+     */
+    summonMinions() {
+        if (!this.active) return;
+        
+        // Create visual effect for summoning
+        VisualEffects.createFlashEffect(
+            this.scene, 
+            this.x, 
+            this.y, 
+            this.width * 3, 
+            this.height * 3, 
+            0x00FF00, 
+            0.5, 
+            500
+        );
+        
+        // Number of minions to summon based on boss phase
+        let minionCount = 3;
+        if (this.bossPhase >= 2) minionCount = 5;
+        if (this.bossPhase >= 3) minionCount = 7;
+        
+        // Spawn minions in a circle around the boss
+        for (let i = 0; i < minionCount; i++) {
+            const angle = (i / minionCount) * Math.PI * 2;
+            const distance = this.width * 2;
+            const x = this.x + Math.cos(angle) * distance;
+            const y = this.y + Math.sin(angle) * distance;
+            
+            // Create a basic enemy minion
+            if (this.scene.spawnSystem) {
+                // Use the newly added spawnEnemyAtPosition method
+                this.scene.spawnSystem.spawnEnemyAtPosition(x, y, 'melee');
+            } else {
+                // Fallback if spawn system isn't available
+                const minion = Enemy.createEnemy(this.scene, x, y, 1, 'melee');
+                if (this.scene.enemies) {
+                    this.scene.enemies.add(minion);
+                }
+            }
+            
+            // Add spawn particle effect
+            VisualEffects.createEntitySpawnEffect(this.scene, x, y, 0x00FF00);
+        }
+        
+        // Play summoning sound if audio manager exists
+        if (this.scene.audioManager) {
+            this.scene.audioManager.playSFX('summon');
+        }
+    }
+    
+    /**
      * Check if boss should transition to the next phase
      */
     checkBossPhaseTransition() {

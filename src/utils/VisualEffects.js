@@ -632,4 +632,47 @@ export function createBossHealthBar(scene, boss) {
     });
     
     return boss.enhancedHealthBar;
+}
+
+/**
+ * Create an entity spawn effect with particles
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} color - Color of particles (hex)
+ * @param {number} quantity - Number of particles
+ * @returns {Phaser.GameObjects.Particles.ParticleEmitter} The particle emitter
+ */
+export function createEntitySpawnEffect(scene, x, y, color = 0x00FF00, quantity = 15) {
+    // Create a flash circle
+    const flash = scene.add.circle(x, y, TILE_SIZE, color, 0.6);
+    
+    // Animate the flash
+    scene.tweens.add({
+        targets: flash,
+        alpha: 0,
+        scale: 2,
+        duration: 500,
+        onComplete: () => flash.destroy()
+    });
+    
+    // Create particles that expand outward
+    const emitter = scene.add.particles(x, y, 'particle', {
+        speed: { min: 30, max: 80 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 0.6, end: 0 },
+        lifespan: { min: 300, max: 500 },
+        quantity: quantity,
+        tint: color,
+        emitting: false
+    });
+    
+    if (emitter) {
+        emitter.explode(quantity);
+        scene.time.delayedCall(500, () => {
+            if (emitter && emitter.active) emitter.destroy();
+        });
+    }
+    
+    return emitter;
 } 

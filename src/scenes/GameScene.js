@@ -3,6 +3,7 @@ import { createGameTextures } from '../utils/textureGenerator.js';
 import * as Helpers from '../utils/helpers.js';
 import { heroClasses } from '../data/heroClasses.js';
 import { engineerClasses } from '../data/engineerClasses.js';
+import ResourceManager from '../utils/ResourceManager.js';
 
 // Import our new modular systems
 import Player from '../entities/Player.js';
@@ -51,6 +52,7 @@ export default class GameScene extends Phaser.Scene {
         this.terrainSystem = null; // New terrain system
         this.audioManager = null; // New audio system
         this.entityFactory = null;
+        this.resourceManager = null; // Resource manager for object pooling
     }
     
     /**
@@ -99,14 +101,37 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('gamemap_03', 'assets/images/backgrounds/gamemap_03.jpg');
         this.load.image('gamemap_04', 'assets/images/backgrounds/gamemap_04.jpg');
         
-        // Load character assets
-        this.load.spritesheet('warrior', 'assets/images/characters/warrior.png', {
+        // Load character assets - only load for the selected hero
+        const heroKey = this.selectedHeroKey || 'warrior';
+        console.log(`Loading assets for selected hero: ${heroKey}`);
+        
+        // Load the selected hero's spritesheet
+        this.load.spritesheet(heroKey, `assets/images/characters/${heroKey}.png`, {
             frameWidth: 96,
             frameHeight: 96,
             margin: 0,
             spacing: 0
         });
-        this.load.json('warrior_animations', 'assets/images/characters/warrior_animations.anim');
+        
+        // Load engineer class sprite sheets
+        console.log('Loading Chronotemporal spritesheet');
+        this.load.spritesheet('Chronotemporal', 'assets/images/characters/Chronotemporal.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Voltaic spritesheet');
+        this.load.spritesheet('Voltaic', 'assets/images/characters/Voltaic.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        // Note: We're no longer loading JSON animation files since we're creating
+        // animations directly from the sprite sheet in the Player class
         
         // Load enemy assets
         this.load.spritesheet('enemy', 'assets/images/enemies/basic_enemy.png', {
@@ -115,7 +140,7 @@ export default class GameScene extends Phaser.Scene {
         });
         
         // Load combat assets
-        this.load.image('bullet', 'assets/images/projectiles/bullet.png');
+        this.load.image('bullet', 'assets/images/projectiles/particle.png');
         this.load.image('particle', 'assets/images/effects/particle.png');
         this.load.image('arrow', 'assets/images/projectiles/arrow.png');
         
@@ -127,6 +152,11 @@ export default class GameScene extends Phaser.Scene {
      */
     create() {
         console.log('GameScene create - Starting game scene setup');
+        console.log(`Selected hero class: ${this.selectedHeroKey}`);
+
+        // Initialize resource manager first for other systems to use
+        this.resourceManager = new ResourceManager(this);
+        console.log('Resource manager initialized');
 
         // Create the game map - directly use imported constants 
         
@@ -153,7 +183,15 @@ export default class GameScene extends Phaser.Scene {
             console.warn(`Hero key "${this.selectedHeroKey}" not found, defaulting to warrior.`);
             this.selectedHeroKey = 'warrior';
         }
-        console.log('Selected hero:', this.selectedHeroKey, 'Hero class:', currentHeroClass.name);
+        
+        // Verify hero class has key property that matches selection
+        if (currentHeroClass && (!currentHeroClass.key || currentHeroClass.key !== this.selectedHeroKey)) {
+            console.warn(`Hero class key mismatch. Selected: ${this.selectedHeroKey}, Class key: ${currentHeroClass.key}`);
+            // Fix the key to match selection
+            currentHeroClass.key = this.selectedHeroKey;
+        }
+        
+        console.log('Selected hero:', this.selectedHeroKey, 'Hero class:', currentHeroClass?.name, 'Key:', currentHeroClass?.key);
         
         // --- Create Physics Groups ---
         this.createGroups();
@@ -254,6 +292,21 @@ export default class GameScene extends Phaser.Scene {
         const startX = Math.floor(WORLD_WIDTH / 2 / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
         const startY = Math.floor(WORLD_HEIGHT / 2 / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
         
+        // Validate hero class data
+        if (!heroClass) {
+            console.error('No hero class provided to createPlayer');
+            heroClass = heroClasses['warrior']; // Fallback to warrior
+        }
+        
+        // Ensure the hero class has the key property
+        if (!heroClass.key) {
+            console.warn(`Hero class ${heroClass.name} missing key property, setting to: ${this.selectedHeroKey}`);
+            heroClass.key = this.selectedHeroKey;
+        }
+        
+        // Debug logs
+        console.log(`Creating player with hero class: ${heroClass.name}, texture key: ${heroClass.key}`);
+        
         // Delegate to entity factory instead of directly creating Player
         if (!this.entityFactory) {
             // Create entity factory if not already available
@@ -295,31 +348,95 @@ export default class GameScene extends Phaser.Scene {
     }
     
     /**
-     * Set up input controls
+     * Set up keyboard input and touch controls
      */
     setupInput() {
-        // Keyboard input
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.cursors.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-        this.cursors.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-        this.cursors.keyS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
-        this.cursors.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        // Make WASD/arrows move the player
+        this.cursorKeys = this.input.keyboard.createCursorKeys();
+        this.wasd = this.input.keyboard.addKeys({
+            up: Phaser.Input.Keyboard.KeyCodes.W,
+            down: Phaser.Input.Keyboard.KeyCodes.S,
+            left: Phaser.Input.Keyboard.KeyCodes.A,
+            right: Phaser.Input.Keyboard.KeyCodes.D,
+            attack: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            special: Phaser.Input.Keyboard.KeyCodes.SHIFT,
+            chrono: Phaser.Input.Keyboard.KeyCodes.C,
+            voltaic: Phaser.Input.Keyboard.KeyCodes.V
+        });
         
-        // Special attack key
-        this.specialAttackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        // Enable pointer input for touch/mouse
+        this.input.addPointer(3); // Support up to 3 touch points
         
-        // Basic attack key
-        this.basicAttackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
-
-        // Mouse input for right-click attacks
-        this.input.mouse.disableContextMenu();
-        this.input.on('pointerdown', (pointer) => {
-            if (pointer.rightButtonDown()) {
-                this.handleBasicAttack(pointer);
+        // Add debug key for Chronotemporal follower
+        this.chronoKey = this.input.keyboard.addKey('C');
+        this.input.keyboard.on('keydown-C', () => {
+            console.log('C key pressed - creating Chronotemporal follower');
+            this.addChronotemporalFollower();
+        });
+        
+        // Add debug key for Voltaic follower
+        this.voltaicKey = this.input.keyboard.addKey('V');
+        this.input.keyboard.on('keydown-V', () => {
+            console.log('V key pressed - creating Voltaic follower');
+            this.addVoltaicFollower();
+        });
+        
+        // Add debug keys for spawning bosses (1-4)
+        this.input.keyboard.on('keydown-ONE', () => {
+            if (this.gameActive && !this.gameOver) {
+                console.log('Spawning Stage 1 Boss (Summoner)');
+                this.spawnSystem.spawnBoss(1);
             }
         });
         
-        console.log('Input controls set up');
+        this.input.keyboard.on('keydown-TWO', () => {
+            if (this.gameActive && !this.gameOver) {
+                console.log('Spawning Stage 2 Boss (Berserker)');
+                this.spawnSystem.spawnBoss(2);
+            }
+        });
+        
+        this.input.keyboard.on('keydown-THREE', () => {
+            if (this.gameActive && !this.gameOver) {
+                console.log('Spawning Stage 3 Boss (Mad Alchemist)');
+                this.spawnSystem.spawnBoss(3);
+            }
+        });
+        
+        this.input.keyboard.on('keydown-FOUR', () => {
+            if (this.gameActive && !this.gameOver) {
+                console.log('Spawning Stage 4 Boss (Lich King)');
+                this.spawnSystem.spawnBoss(4);
+            }
+        });
+        
+        // Listen for game pause
+        this.input.keyboard.on('keydown-ESC', () => {
+            if (this.gameActive && !this.gameOver) {
+                console.log('Game paused');
+                this.scene.pause();
+                if (this.uiManager) this.uiManager.showPauseMenu();
+            }
+        });
+        
+        // Listen for pointer events
+        this.input.on('pointerdown', (pointer) => {
+            if (!this.player || !this.gameActive || this.gameOver) return;
+            
+            // Get target position in world coordinates, accounting for camera
+            const targetPosition = new Phaser.Math.Vector2(
+                pointer.worldX,
+                pointer.worldY
+            );
+            
+            if (pointer.leftButtonDown()) {
+                // Left click for basic attack
+                this.player.performBasicAttack(targetPosition);
+            } else if (pointer.rightButtonDown()) {
+                // Right click for special attack
+                this.player.useSpecialAttack(this.enemies, this.helpers);
+            }
+        });
     }
     
     /**
@@ -499,15 +616,15 @@ export default class GameScene extends Phaser.Scene {
      */
     handleInput(time) {
         // Handle movement input
-        this.movementSystem.handleInput(this.cursors);
+        this.movementSystem.handleInput(this.cursorKeys);
 
         // Special Attack
-        if (Phaser.Input.Keyboard.JustDown(this.specialAttackKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.wasd.special)) {
              this.useSpecialAttack();
         }
         
         // Basic Attack (Keyboard)
-        if (Phaser.Input.Keyboard.JustDown(this.basicAttackKey)) {
+        if (Phaser.Input.Keyboard.JustDown(this.wasd.attack)) {
             this.handleBasicAttack(null);
         }
     }
@@ -552,13 +669,15 @@ export default class GameScene extends Phaser.Scene {
     }
     
     /**
-     * Create a poison cloud effect at the specified location
-     * @param {number} x - X position
-     * @param {number} y - Y position
-     * @param {number} radius - Cloud radius
+     * Create a poison cloud (delegates to helper but adds pooling)
      */
     createPoisonCloud(x, y, radius) {
-        this.helpers.createPoisonCloud(this, x, y, radius);
+        // If we have a resource manager, use it for particle emitters
+        if (this.resourceManager) {
+            return this.helpers.createPoisonCloudPooled(this, x, y, radius, this.resourceManager);
+        } else {
+            return this.helpers.createPoisonCloud(this, x, y, radius);
+        }
     }
     
     /**
@@ -570,7 +689,12 @@ export default class GameScene extends Phaser.Scene {
      * @param {number} damage - Damage amount
      */
     createTimedExplosion(x, y, radius, delay, damage) {
-        this.helpers.createTimedExplosion(this, x, y, radius, delay, damage);
+        // If we have a resource manager, use it for graphics objects
+        if (this.resourceManager) {
+            return this.helpers.createTimedExplosionPooled(this, x, y, radius, delay, damage, this.resourceManager);
+        } else {
+            return this.helpers.createTimedExplosion(this, x, y, radius, delay, damage);
+        }
     }
     
     /**
@@ -735,5 +859,216 @@ export default class GameScene extends Phaser.Scene {
         this.background = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, backgroundKey);
         this.background.setDisplaySize(WORLD_WIDTH, WORLD_HEIGHT);
         this.background.setDepth(-10); // Set a negative depth to ensure it renders below terrain
+    }
+
+    /**
+     * Add a test Chronotemporal follower for animation testing
+     */
+    addChronotemporalFollower() {
+        console.log('Adding Chronotemporal engineer follower for testing');
+        
+        // Get the Chronotemporal class data
+        const chronotemporalClass = this.engineerClasses.chronotemporal;
+        
+        if (!chronotemporalClass) {
+            console.error('Chronotemporal class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Chronotemporal')) {
+            const texture = this.textures.get('Chronotemporal');
+            console.log('Chronotemporal texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Chronotemporal texture not found!');
+        }
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(chronotemporalClass);
+        
+        if (follower) {
+            console.log('Successfully created Chronotemporal follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Chronotemporal follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+                
+                // Extra test specifically for left animation
+                this.time.delayedCall(6000, () => {
+                    console.log('Extra test for LEFT animation with forced frame:');
+                    follower.setFlipX(false);
+                    follower.setFlipY(false);
+                    follower.angle = 0;
+                    follower.direction = 'left';
+                    follower.playAnimation('left');
+                    
+                    // Also test manual frame setting
+                    this.time.delayedCall(500, () => {
+                        console.log('Setting LEFT animation frames directly (4-7)');
+                        follower.setFrame(4);
+                        
+                        // Cycle through all left frames
+                        [5, 6, 7, 4].forEach((frame, i) => {
+                            this.time.delayedCall(300 + 300 * i, () => {
+                                console.log(`Setting frame ${frame} manually`);
+                                follower.setFrame(frame);
+                            });
+                        });
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Chronotemporal follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Voltaic follower for animation testing
+     */
+    addVoltaicFollower() {
+        console.log('Adding Voltaic engineer follower for testing');
+        
+        // Get the Voltaic class data
+        const voltaicClass = this.engineerClasses.voltaic;
+        
+        if (!voltaicClass) {
+            console.error('Voltaic class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Voltaic')) {
+            const texture = this.textures.get('Voltaic');
+            console.log('Voltaic texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Voltaic texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Voltaic', 'assets/images/characters/Voltaic.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Voltaic texture on demand');
+                this.createVoltaicFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createVoltaicFollower();
+    }
+    
+    /**
+     * Create a Voltaic follower once the texture is loaded
+     * @private
+     */
+    createVoltaicFollower() {
+        // Get the Voltaic class data
+        const voltaicClass = this.engineerClasses.voltaic;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(voltaicClass);
+        
+        if (follower) {
+            console.log('Successfully created Voltaic follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Voltaic follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+                
+                // Extra test specifically for right animation (the one with the frame issue in JSON)
+                this.time.delayedCall(6000, () => {
+                    console.log('Extra test for RIGHT animation with fixed frames:');
+                    follower.setFlipX(false);
+                    follower.setFlipY(false);
+                    follower.angle = 0;
+                    follower.direction = 'right';
+                    follower.playAnimation('right');
+                });
+            });
+        } else {
+            console.error('Failed to create Voltaic follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Clean up resources on scene shutdown
+     */
+    shutdown() {
+        super.shutdown();
+        
+        // Clean up pooled resources
+        if (this.resourceManager) {
+            console.log('Cleaning up resource manager pools');
+            this.resourceManager.cleanup();
+        }
     }
 } 

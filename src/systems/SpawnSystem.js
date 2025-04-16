@@ -940,4 +940,43 @@ export default class SpawnSystem {
         // No suitable position found after max attempts
         return null;
     }
+    
+    /**
+     * Spawn an enemy at a specific position
+     * @param {number} x - X coordinate
+     * @param {number} y - Y coordinate
+     * @param {string} type - Enemy type
+     * @returns {Enemy} The spawned enemy
+     */
+    spawnEnemyAtPosition(x, y, type) {
+        if (this.scene.gameOver) return null;
+        
+        // Clamp coordinates to stay within world bounds
+        x = Phaser.Math.Clamp(x, TILE_SIZE, WORLD_WIDTH - TILE_SIZE);
+        y = Phaser.Math.Clamp(y, TILE_SIZE, WORLD_HEIGHT - TILE_SIZE);
+        
+        // Create enemy with type and level-appropriate difficulty
+        const enemy = Enemy.createEnemy(this.scene, x, y, this.currentLevel, type);
+        this.scene.enemies.add(enemy);
+        
+        // Make sure any added enemies are tracked properly in the wave
+        if (this.waveActive) {
+            this.enemiesSpawnedInWave++;
+            this.totalEnemies++;
+            
+            // Update UI with the new enemy counts
+            if (this.scene.uiManager) {
+                this.scene.uiManager.updateWaveInfo(
+                    this.currentWave,
+                    this.totalWaves,
+                    this.enemiesRemainingInWave,
+                    this.totalEnemies,
+                    this.enemiesSpawnedInWave,
+                    this.enemiesKilledInWave
+                );
+            }
+        }
+        
+        return enemy;
+    }
 } 

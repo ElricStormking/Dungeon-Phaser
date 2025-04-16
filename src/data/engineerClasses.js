@@ -1,5 +1,6 @@
 import { TILE_SIZE, GAME_WIDTH, GAME_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT } from '../constants.js';
-// TODO: Import or pass helper functions
+// Importing helper functions instead of passing them
+import { createLightningEffect, createJaggedLine, damageEnemy, safeDestroy } from '../utils/helpers.js';
 
 // Engineer follower classes with unique abilities
 export const engineerClasses = {
@@ -27,7 +28,8 @@ export const engineerClasses = {
                     enemy.body.velocity.x *= 0.3; // Also affect current velocity
                     enemy.body.velocity.y *= 0.3;
                     
-                    const emitter = scene.add.particles(enemy.x, enemy.y, 'particle', {
+                    // Use a reference to emitter for proper cleanup
+                    let emitter = scene.particleManager?.get() || scene.add.particles(enemy.x, enemy.y, 'particle', {
                         speed: { min: 20, max: 40 },
                         scale: { start: 0.4, end: 0 },
                         lifespan: 1000,
@@ -36,22 +38,29 @@ export const engineerClasses = {
                         tint: 0xAA88FF,
                         emitting: true // Keep emitting for follow effect
                     });
-                    if (!emitter) return; 
+                    
+                    // Store reference on enemy for cleanup
+                    enemy.frozenEmitter = emitter;
 
                     let slowTimer = scene.time.addEvent({
                         delay: 100,
                         callback: () => {
-                            if (enemy.active && enemy.isFrozen) {
+                            if (enemy.active && enemy.isFrozen && emitter && !emitter.destroyed) {
                                 emitter.setPosition(enemy.x, enemy.y); // Update position
                             } else {
-                                emitter.stop(); // Stop emitting
-                                // Destroy emitter after particles fade
-                                scene.time.delayedCall(1000, () => { if (emitter) emitter.destroy(); }); 
+                                if (emitter && !emitter.destroyed) {
+                                    emitter.stop(); // Stop emitting
+                                    // Destroy emitter after particles fade
+                                    scene.time.delayedCall(1000, () => safeDestroy(emitter)); 
+                                }
                                 if (slowTimer) slowTimer.remove();
                             }
                         },
                         loop: true 
                     });
+                    
+                    // Store reference on enemy
+                    enemy.slowTimer = slowTimer;
                     
                     scene.time.delayedCall(2000, () => {
                         if (enemy.active) {
@@ -63,11 +72,18 @@ export const engineerClasses = {
                                 // scene.physics.moveToObject(enemy, scene.player, enemy.speed); 
                             }
                         }
-                         if (slowTimer) slowTimer.remove();
-                         if (emitter && emitter.active) { 
-                            emitter.stop();
-                            scene.time.delayedCall(1000, () => { if (emitter) emitter.destroy(); });
-                         }
+                        
+                        // Clean up references
+                        if (enemy.slowTimer) {
+                            enemy.slowTimer.remove();
+                            enemy.slowTimer = null;
+                        }
+                        
+                        if (enemy.frozenEmitter && !enemy.frozenEmitter.destroyed) { 
+                            enemy.frozenEmitter.stop();
+                            scene.time.delayedCall(1000, () => safeDestroy(enemy.frozenEmitter));
+                            enemy.frozenEmitter = null;
+                        }
                     });
                     
                     affected++;
@@ -82,7 +98,7 @@ export const engineerClasses = {
                     targets: timeEffect,
                     alpha: 0,
                     duration: 500,
-                    onComplete: () => timeEffect.destroy()
+                    onComplete: () => safeDestroy(timeEffect)
                 });
             }
             return affected > 0;
@@ -113,8 +129,8 @@ export const engineerClasses = {
                     break; // Stop chaining if target is invalid or already hit
                 }
 
-                helpers.createLightningEffect(scene, sourcePos.x, sourcePos.y, currentTarget.x, currentTarget.y, lightningGraphics);
-                helpers.damageEnemy(scene, currentTarget, 1);
+                createLightningEffect(scene, sourcePos.x, sourcePos.y, currentTarget.x, currentTarget.y, lightningGraphics);
+                damageEnemy(scene, currentTarget, 1);
                 chainedEnemies.add(currentTarget);
                 
                 sourcePos = { x: currentTarget.x, y: currentTarget.y };
@@ -134,8 +150,9 @@ export const engineerClasses = {
                 currentTarget = nextTarget; 
             }
 
+            // Use timeout to clean up graphics
             scene.time.delayedCall(200, () => { // Reduced delay for faster cleanup
-                lightningGraphics.forEach(line => line.destroy());
+                lightningGraphics.forEach(line => safeDestroy(line));
             });
             
             return chainedEnemies.size > 0;
@@ -180,7 +197,8 @@ export const engineerClasses = {
                             enemy.body.velocity.y = 0;
                             enemy.speed = 0;
                             
-                            const emitter = scene.add.particles(enemy.x, enemy.y, 'particle', {
+                            // Track emitters on the enemy object for proper cleanup
+                            const emitter = scene.particleManager?.get() || scene.add.particles(enemy.x, enemy.y, 'particle', {
                                 speed: { min: 10, max: 20 },
                                 scale: { start: 0.5, end: 0 },
                                 lifespan: 1000,
@@ -188,11 +206,17 @@ export const engineerClasses = {
                                 frequency: 200, // Emits over time while frozen
                                 tint: 0xB0E0E6
                             });
-                            if (!emitter) return;
+                            
+                            // Store reference on enemy
+                            enemy.frostEmitter = emitter;
+                            
                             // Automatically destroy emitter after unfreeze delay + lifespan
-                             scene.time.delayedCall(2500 + 1000, () => { if (emitter) emitter.destroy(); });
+                            scene.time.delayedCall(2500 + 1000, () => {
+                                if (enemy.frostEmitter) safeDestroy(enemy.frostEmitter);
+                                enemy.frostEmitter = null;
+                            });
 
-                            helpers.damageEnemy(scene, enemy, 1);
+                            damageEnemy(scene, enemy, 1);
                             
                             scene.time.delayedCall(2500, () => {
                                 if (enemy.active && enemy.frozenByNova) {
@@ -201,16 +225,22 @@ export const engineerClasses = {
                                     enemy.isFrozen = false; // General frozen flag
                                     if (enemy.originalSpeed) {
                                          enemy.speed = enemy.originalSpeed; 
-                                         // scene.physics.moveToObject(enemy, scene.player, enemy.speed);
-                                     }
+                                    }
                                 }
-                                if (emitter) emitter.stop(); // Stop emitting when unfrozen
+                                if (enemy.frostEmitter) {
+                                    enemy.frostEmitter.stop(); // Stop emitting when unfrozen
+                                }
                             });
                         }
                     });
                 },
                 onComplete: () => {
-                    scene.tweens.add({ targets: nova, alpha: 0, duration: 300, onComplete: () => nova.destroy() });
+                    scene.tweens.add({ 
+                        targets: nova, 
+                        alpha: 0, 
+                        duration: 300, 
+                        onComplete: () => safeDestroy(nova) 
+                    });
                 }
             });
             
@@ -222,27 +252,31 @@ export const engineerClasses = {
         color: 0x696969, // Dark Gray
         ability: 'Gear Throw',
         description: 'Throws deadly spinning gears that pierce through enemies',
-        specialAttack: function(scene, follower, enemies, helpers) { // Pass bullets group
-             if (enemies.getLength() === 0) return false;
+        specialAttack: function(scene, follower, enemies, helpers) {
+            if (enemies.getLength() === 0) return false;
             
             const directions = [
                 { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
             ];
             
+            // Track active gears for potential cleanup
+            const activeGears = [];
+            
             directions.forEach(dir => {
-                const gear = scene.bullets.create(follower.x, follower.y, 'bullet'); // Assuming scene.bullets is a Group
+                // Get bullet from pool if available
+                const gear = scene.bullets.create(follower.x, follower.y, 'bullet');
                 if (!gear) return; // Pool might be empty
 
+                activeGears.push(gear);
                 gear.setActive(true).setVisible(true);
                 gear.setTint(0x696969);
-                // gear.setPipeline('Light2D'); // Requires WebGL and Light Pipeline
                 gear.setScale(1.3);
                 
                 const speed = 250;
                 gear.body.velocity.x = dir.x * speed;
                 gear.body.velocity.y = dir.y * speed;
                 
-                // Custom properties for piercing logic (handle in bullet update/collision)
+                // Custom properties for piercing logic
                 gear.isPiercing = true;
                 gear.pierceCount = 0;
                 gear.maxPierces = 3;
@@ -250,16 +284,20 @@ export const engineerClasses = {
                 gear.hitEnemies = new Set(); // Track enemies hit by this gear
                 gear.type = 'gear'; // Identify type if needed
 
-                scene.tweens.add({
+                // Use a single gear rotation tween
+                const rotateTween = scene.tweens.add({
                     targets: gear,
                     angle: 360,
                     duration: 1000,
                     repeat: -1,
                     ease: 'Linear'
                 });
+                
+                // Store tween reference for cleanup
+                gear.rotateTween = rotateTween;
 
-                 // Trail effect (consider pooling emitters)
-                const trailEmitter = scene.add.particles(gear.x, gear.y, 'particle', {
+                // Trail effect (use object pooling if available)
+                const trailEmitter = scene.particleManager?.get() || scene.add.particles(gear.x, gear.y, 'particle', {
                     speed: 10,
                     scale: { start: 0.2, end: 0 },
                     blendMode: 'ADD',
@@ -267,12 +305,22 @@ export const engineerClasses = {
                     tint: 0x696969,
                     follow: gear // Use the built-in follow property
                 });
-                 if (!trailEmitter) return; 
+                
+                // Store emitter reference on gear
+                gear.trailEmitter = trailEmitter;
 
-                 // Destroy emitter when gear is destroyed
-                 gear.on('destroy', () => {
-                      if (trailEmitter) trailEmitter.destroy();
-                  });
+                // Add cleanup for both emitter and tween on destroy
+                gear.once('destroy', () => {
+                    if (gear.trailEmitter) safeDestroy(gear.trailEmitter);
+                    if (gear.rotateTween && gear.rotateTween.isPlaying()) gear.rotateTween.stop();
+                });
+                
+                // Safety timer for bullets that don't hit anything
+                scene.time.delayedCall(5000, () => {
+                    if (gear.active) {
+                        safeDestroy(gear);
+                    }
+                });
             });
             
             return true;
@@ -363,28 +411,43 @@ export const engineerClasses = {
             const endY = follower.y + Math.sin(angle) * beamLength;
             const beamLine = new Phaser.Geom.Line(follower.x, follower.y, endX, endY);
 
+            // Collect all visual elements for batch cleanup
+            const visualElements = [];
+
             // Visuals
             const beam = scene.add.graphics();
+            visualElements.push(beam);
             beam.lineStyle(6, 0x800080, 0.8);
             beam.strokeLineShape(beamLine);
+            
             const glowBeam = scene.add.graphics();
+            visualElements.push(glowBeam);
             glowBeam.lineStyle(12, 0x800080, 0.3);
             glowBeam.strokeLineShape(beamLine);
-            scene.tweens.add({ targets: [beam, glowBeam], alpha: 0, duration: 500, onComplete: () => { beam.destroy(); glowBeam.destroy(); } });
+            
+            // Tween to fade out beams
+            scene.tweens.add({ 
+                targets: [beam, glowBeam], 
+                alpha: 0, 
+                duration: 500, 
+                onComplete: () => {
+                    visualElements.forEach(element => safeDestroy(element));
+                }
+            });
 
-            // Particles
-            const beamParticles = scene.add.particles(0, 0, 'particle', { // Start at 0,0 - position set per point
-                speed: { min: 10, max: 50 }, scale: { start: 0.4, end: 0 },
-                blendMode: 'ADD', lifespan: 500, tint: 0x800080,
+            // Particles - use object pooling if available
+            const beamParticles = scene.particleManager?.get() || scene.add.particles(0, 0, 'particle', {
+                speed: { min: 10, max: 50 }, 
+                scale: { start: 0.4, end: 0 },
+                blendMode: 'ADD', 
+                lifespan: 500, 
+                tint: 0x800080,
                 emitting: false // Don't start emitting
             });
-            if (!beamParticles) return false;
+            visualElements.push(beamParticles);
 
             const points = beamLine.getPoints(10); // Fewer points for shorter beam
             points.forEach(p => beamParticles.emitParticleAt(p.x, p.y, 3)); // Emit at points
-
-            // Destroy after short delay
-            scene.time.delayedCall(500, () => { if (beamParticles) beamParticles.destroy(); });
 
             // Damage
             let hitCount = 0;
@@ -393,13 +456,28 @@ export const engineerClasses = {
                 // More robust check: distance from enemy center to the line segment
                 const enemyPoint = new Phaser.Geom.Point(enemy.x, enemy.y);
                 if (Phaser.Geom.Intersects.LineToCircle(beamLine, new Phaser.Geom.Circle(enemy.x, enemy.y, TILE_SIZE / 2))) {
-                    helpers.damageEnemy(scene, enemy, 3);
+                    damageEnemy(scene, enemy, 3);
                     hitCount++;
                     // Visual impact
                     const impact = scene.add.sprite(enemy.x, enemy.y, 'particle').setTint(0x800080).setScale(2);
-                    scene.tweens.add({ targets: impact, alpha: 0, scale: 0.5, duration: 300, onComplete: () => impact.destroy() });
+                    visualElements.push(impact);
+                    scene.tweens.add({ 
+                        targets: impact, 
+                        alpha: 0, 
+                        scale: 0.5, 
+                        duration: 300, 
+                        onComplete: () => safeDestroy(impact)
+                    });
                 }
             });
+            
+            // Destroy all visual elements after effect completes
+            scene.time.delayedCall(500, () => {
+                visualElements.forEach(element => {
+                    if (!element.destroyed) safeDestroy(element);
+                });
+            });
+            
             return hitCount > 0;
         }
     },

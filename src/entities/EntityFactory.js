@@ -24,6 +24,14 @@ export default class EntityFactory {
      * @returns {Player} The created player
      */
     createPlayer(x, y, heroClass) {
+        // Ensure the hero class has a proper key property for texture selection
+        if (!heroClass.key) {
+            console.warn('Hero class missing key property, defaulting to warrior');
+            heroClass.key = 'warrior';
+        }
+        
+        console.log(`Creating player with hero class: ${heroClass.name} (${heroClass.key})`);
+        
         // Create player using the Player class
         const player = new Player(this.scene, x, y, heroClass);
         

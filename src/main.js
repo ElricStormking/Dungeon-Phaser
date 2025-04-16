@@ -1,5 +1,5 @@
 import { GAME_WIDTH, GAME_HEIGHT } from './constants.js';
-import { TitleScene } from './scenes/TitleScene.js';
+import TitleScene from './scenes/TitleScene.js';
 import GameScene from './scenes/GameScene.js';
 
 // Configure the game

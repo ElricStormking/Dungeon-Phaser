@@ -143,17 +143,20 @@ export default class MovementSystem {
     
     /**
      * Handle input for direction changes
-     * @param {object} cursors - Input cursors
+     * @param {object} cursorKeys - Input cursors
      */
-    handleInput(cursors) {
+    handleInput(cursorKeys) {
         let dx = 0;
         let dy = 0;
         
-        // Determine input direction
-        if (cursors.left.isDown || cursors.keyA.isDown) dx = -1;
-        else if (cursors.right.isDown || cursors.keyD.isDown) dx = 1;
-        if (cursors.up.isDown || cursors.keyW.isDown) dy = -1;
-        else if (cursors.down.isDown || cursors.keyS.isDown) dy = 1;
+        // Access the wasd keys from the scene if available
+        const wasd = this.scene.wasd;
+        
+        // Determine input direction using both cursor keys and WASD
+        if (cursorKeys.left.isDown || (wasd && wasd.left.isDown)) dx = -1;
+        else if (cursorKeys.right.isDown || (wasd && wasd.right.isDown)) dx = 1;
+        if (cursorKeys.up.isDown || (wasd && wasd.up.isDown)) dy = -1;
+        else if (cursorKeys.down.isDown || (wasd && wasd.down.isDown)) dy = 1;
         
         // Update nextDirection based on input, preventing reversal
         if (dx < 0 && this.direction !== 'right') this.nextDirection = 'left';
@@ -251,17 +254,24 @@ export default class MovementSystem {
         // Update player's direction property
         player.direction = this.direction;
         
-        // Only set angle for non-warrior sprites (warrior uses animations)
-        if (player.texture.key !== 'warrior') {
+        // Only set angle for non-sprite player (warrior uses animations)
+        if (player.texture.key !== 'warrior' && !player.usesAnimations) {
             player.setAngleFromDirection();
         }
         
-        // Set angles for followers
+        // Set angles and directions for followers
         for (let i = 0; i < this.scene.followers.length; i++) {
             const follower = this.scene.followers[i];
             if (follower && follower.active) {
                 follower.direction = this.targetPositions[i + 1].dir;
-                follower.setAngleFromDirection();
+                
+                // Only set angle for non-animated followers
+                if (!follower.usesAnimations) {
+                    follower.setAngleFromDirection();
+                } else {
+                    // For animated followers, make sure angle is reset to 0
+                    follower.angle = 0;
+                }
             }
         }
         

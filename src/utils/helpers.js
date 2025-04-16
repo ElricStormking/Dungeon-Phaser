@@ -436,4 +436,230 @@ export function safeDestroy(object) {
     } catch (e) {
         console.warn('Error safely destroying object:', e);
     }
+}
+
+/**
+ * Creates a poison cloud effect using object pooling for better performance
+ * @param {Phaser.Scene} scene - The current scene
+ * @param {number} x - X position of cloud center
+ * @param {number} y - Y position of cloud center
+ * @param {number} radius - Radius of the cloud
+ * @param {ResourceManager} resourceManager - Resource manager for pooled objects
+ */
+export function createPoisonCloudPooled(scene, x, y, radius, resourceManager) {
+    // Get graphics object from pool instead of creating new one
+    const cloud = resourceManager ? resourceManager.getGraphics() : scene.add.graphics();
+    if (!cloud) return; // Fallback if pool is exhausted
+    
+    // Set up the cloud
+    cloud.fillStyle(0x00FF00, 0.3);
+    cloud.fillCircle(x, y, radius);
+    cloud.setDepth(5);
+    
+    // Use pooled particles if available
+    const emitter = resourceManager ? 
+        resourceManager.getParticles(x, y, 'particle', {
+            speed: { min: 10, max: 30 },
+            scale: { start: 0.5, end: 0 },
+            quantity: 1,
+            lifespan: 1000,
+            frequency: 100,
+            tint: [0x55FF55, 0x00AA00, 0x00FF00]
+        }) :
+        scene.add.particles(x, y, 'particle', {
+            speed: { min: 10, max: 30 },
+            scale: { start: 0.5, end: 0 },
+            quantity: 1,
+            lifespan: 1000,
+            frequency: 100,
+            tint: [0x55FF55, 0x00AA00, 0x00FF00]
+        });
+        
+    if (!emitter) return; // Fallback if emitter creation fails
+    
+    // Set emitter zone
+    emitter.setEmitZone({
+        type: 'random',
+        source: new Phaser.Geom.Circle(0, 0, radius * 0.9),
+        quantity: 10
+    });
+    
+    // Damage logic
+    let damageTimer = scene.time.addEvent({
+        delay: 500,
+        callback: () => {
+            scene.enemies.getChildren().forEach(enemy => {
+                if (!enemy.active) return;
+                
+                const distance = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+                if (distance <= radius) {
+                    damageEnemy(scene, enemy, 1);
+                }
+            });
+        },
+        repeat: 5 // Total duration 3 seconds (6 ticks)
+    });
+    
+    // Clean up graphics with fade out
+    scene.tweens.add({
+        targets: cloud,
+        alpha: 0,
+        duration: 3000,
+        onComplete: () => {
+            // Return to pool instead of destroying
+            if (resourceManager) {
+                resourceManager.release(cloud);
+            } else {
+                safeDestroy(cloud);
+            }
+        }
+    });
+    
+    // Clean up emitter after use
+    scene.time.delayedCall(3000, () => {
+        if (emitter) {
+            emitter.stop();
+            // Return to pool instead of destroying
+            if (resourceManager) {
+                scene.time.delayedCall(1000, () => resourceManager.release(emitter));
+            } else {
+                scene.time.delayedCall(1000, () => safeDestroy(emitter));
+            }
+        }
+        
+        if (damageTimer && damageTimer.active) {
+            damageTimer.remove();
+        }
+    });
+    
+    return { cloud, emitter };
+}
+
+/**
+ * Creates a timed explosion effect using object pooling for better performance
+ * @param {Phaser.Scene} scene - The current scene
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} radius - Explosion radius
+ * @param {number} delay - Delay before explosion (ms)
+ * @param {number} damage - Damage amount
+ * @param {ResourceManager} resourceManager - Resource manager for pooled objects
+ */
+export function createTimedExplosionPooled(scene, x, y, radius = 80, delay = 1500, damage = 3, resourceManager) {
+    // Use pooled graphics if available
+    const indicator = resourceManager ? resourceManager.getGraphics() : scene.add.graphics();
+    if (!indicator) return; // Fallback if pool is exhausted
+    
+    // Draw explosion area indicator
+    indicator.lineStyle(2, 0xFF0000, 0.5);
+    indicator.strokeCircle(x, y, radius);
+    
+    // Add a fill with lower alpha
+    indicator.fillStyle(0xFF0000, 0.2);
+    indicator.fillCircle(x, y, radius);
+    
+    // Pulsing effect using tweens
+    scene.tweens.add({
+        targets: indicator,
+        alpha: 0.1,
+        duration: 500,
+        yoyo: true,
+        repeat: Math.floor(delay / 1000) // Repeat based on delay duration
+    });
+    
+    // Create a countdown text
+    const countdownText = scene.add.text(x, y, (delay / 1000).toFixed(1), {
+        fontSize: '24px',
+        fontFamily: 'Arial',
+        fill: '#FFFFFF',
+        stroke: '#000000',
+        strokeThickness: 3
+    }).setOrigin(0.5);
+    
+    // Update countdown
+    const updateInterval = 100; // Update every 100ms for smoother countdown
+    let timeLeft = delay;
+    
+    const countdownTimer = scene.time.addEvent({
+        delay: updateInterval,
+        callback: () => {
+            timeLeft -= updateInterval;
+            if (timeLeft <= 0) {
+                countdownText.setText('0');
+                return;
+            }
+            countdownText.setText((timeLeft / 1000).toFixed(1));
+        },
+        repeat: delay / updateInterval
+    });
+    
+    // Trigger the explosion after delay
+    scene.time.delayedCall(delay, () => {
+        // Cleanup countdown
+        countdownText.destroy();
+        if (countdownTimer && countdownTimer.active) {
+            countdownTimer.remove();
+        }
+        
+        // Return indicator to pool instead of destroying
+        if (resourceManager) {
+            resourceManager.release(indicator);
+        } else {
+            safeDestroy(indicator);
+        }
+        
+        // Use pooled particles for explosion
+        const explosionParticles = resourceManager ?
+            resourceManager.getParticles(x, y, 'particle', {
+                speed: { min: 50, max: 200 },
+                scale: { start: 0.8, end: 0 },
+                lifespan: 800,
+                quantity: 30,
+                tint: [0xFF0000, 0xFF5500, 0xFFAA00],
+                blendMode: 'ADD',
+                emitting: false
+            }) :
+            scene.add.particles(x, y, 'particle', {
+                speed: { min: 50, max: 200 },
+                scale: { start: 0.8, end: 0 },
+                lifespan: 800,
+                quantity: 30,
+                tint: [0xFF0000, 0xFF5500, 0xFFAA00],
+                blendMode: 'ADD',
+                emitting: false
+            });
+            
+        if (!explosionParticles) return; // Fallback if creation fails
+        
+        // Create a one-time explosion
+        explosionParticles.explode(30);
+        
+        // Clean up the explosion particles
+        scene.time.delayedCall(1000, () => {
+            if (resourceManager) {
+                resourceManager.release(explosionParticles);
+            } else {
+                safeDestroy(explosionParticles);
+            }
+        });
+        
+        // Damage enemies within the radius
+        scene.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active) return;
+            
+            const distance = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+            if (distance <= radius) {
+                damageEnemy(scene, enemy, damage);
+                
+                // Add knockback effect
+                const angle = Phaser.Math.Angle.Between(x, y, enemy.x, enemy.y);
+                const knockbackForce = 150 * (1 - distance / radius); // Stronger closer to center
+                
+                enemy.body.velocity.x += Math.cos(angle) * knockbackForce;
+                enemy.body.velocity.y += Math.sin(angle) * knockbackForce;
+            }
+        });
+    });
+    
+    return indicator;
 } 

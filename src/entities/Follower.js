@@ -7,7 +7,17 @@ import { TILE_SIZE } from '../constants.js';
  */
 export default class Follower extends Character {
     constructor(scene, x, y, config = {}) {
-        super(scene, x, y, 'follower', {
+        // Special case for animated followers using sprite sheets
+        let textureKey = 'follower';
+        if (config.isEngineer && config.engineerClass) {
+            if (config.engineerClass.name === 'Chronotemporal') {
+                textureKey = 'Chronotemporal';
+            } else if (config.engineerClass.name === 'Voltaic') {
+                textureKey = 'Voltaic';
+            }
+        }
+        
+        super(scene, x, y, textureKey, {
             health: config.isEngineer ? 2 : 1,
             maxHealth: config.isEngineer ? 2 : 1,
             direction: config.direction || 'right',
@@ -22,6 +32,7 @@ export default class Follower extends Character {
         
         // Engineer properties
         this.isEngineerFollower = config.isEngineer || false;
+        this.usesAnimations = false;
         
         if (this.isEngineerFollower && config.engineerClass) {
             this.engineerClass = config.engineerClass;
@@ -29,10 +40,195 @@ export default class Follower extends Character {
             this.specialAttackCooldown = 0; // Start at 0 to allow first attack quickly
             this.specialAttackCooldownMax = 0; // Will be set in initEngineerCooldown
             this.initEngineerCooldown();
+            
+            // Set up animations for sprite-based followers
+            const animatedClasses = ['Chronotemporal', 'Voltaic'];
+            if (animatedClasses.includes(this.engineerClass.name)) {
+                console.log(`Creating ${this.engineerClass.name} follower with special animations`);
+                this.usesAnimations = true;
+                
+                // Force angle to 0 from the start
+                this.angle = 0;
+                
+                // Create animations after a short delay to ensure texture is loaded
+                scene.time.delayedCall(100, () => {
+                    this.createAnimations();
+                    // Play default animation
+                    this.playAnimation(this.direction || 'down');
+                });
+                
+                // Don't apply tint to sprite sheet characters
+                this.clearTint();
+            }
         }
         
-        // Set angle based on direction
-        this.setAngleFromDirection();
+        // Set angle based on direction (for non-animated followers)
+        if (!this.usesAnimations) {
+            this.setAngleFromDirection();
+        }
+    }
+    
+    /**
+     * Create animations for sprite sheet based followers
+     */
+    createAnimations() {
+        if (!this.usesAnimations) return;
+        
+        const scene = this.scene;
+        const anims = scene.anims;
+        const textureKey = this.texture.key;
+        
+        try {
+            console.log(`Creating ${textureKey} follower animations`);
+            
+            // Define the animation frame mappings based on the sprite sheet layout
+            const animationFrames = {
+                'down': { start: 0, end: 3 },
+                'left': { start: 4, end: 7 },
+                'right': { start: 8, end: 11 },
+                'up': { start: 12, end: 15 }
+            };
+            
+            // Fix for Voltaic right animation which has a wrong frame in the JSON
+            // The JSON specifies frame 7 as the last frame instead of 11
+            if (textureKey === 'Voltaic') {
+                console.log('Using corrected frame mappings for Voltaic');
+                // Create a custom frames array for the right animation
+                // to fix the issue in the JSON where it uses frame 7 instead of 11
+                animationFrames.right.frames = [8, 9, 10, 11]; // Use explicit frames instead of start/end
+                delete animationFrames.right.start;
+                delete animationFrames.right.end;
+            }
+            
+            // Create prefixed animation keys
+            const directions = ['down', 'up', 'left', 'right'];
+            const animKeys = directions.map(dir => `${textureKey}_walk_${dir}`);
+            
+            // Remove existing animations if they exist
+            animKeys.forEach(key => {
+                if (anims.exists(key)) {
+                    anims.remove(key);
+                    console.log(`Removed existing animation: ${key}`);
+                }
+            });
+            
+            // Create animations one by one with detailed logging
+            directions.forEach(direction => {
+                const frames = animationFrames[direction];
+                const key = `${textureKey}_walk_${direction}`;
+                
+                console.log(`Creating animation ${key}`);
+                
+                // Remove any existing animation with this key
+                if (anims.exists(key)) {
+                    anims.remove(key);
+                }
+                
+                // Create the animation
+                if (frames.frames) {
+                    // Use custom frames array if provided (for Voltaic right animation fix)
+                    console.log(`Using custom frames: ${frames.frames.join(', ')}`);
+                    anims.create({
+                        key: key,
+                        frames: frames.frames.map(frame => ({ 
+                            key: textureKey, 
+                            frame: frame 
+                        })),
+                        frameRate: 6,
+                        repeat: -1
+                    });
+                } else {
+                    // Use start/end range
+                    console.log(`Using frame range: ${frames.start}-${frames.end}`);
+                    anims.create({
+                        key: key,
+                        frames: anims.generateFrameNumbers(textureKey, { 
+                            start: frames.start, 
+                            end: frames.end 
+                        }),
+                        frameRate: 6,
+                        repeat: -1
+                    });
+                }
+                
+                // Verify the animation was created
+                if (anims.exists(key)) {
+                    const animObj = anims.get(key);
+                    console.log(`Successfully created animation: ${key}, frames: ${animObj.frames.length}`);
+                } else {
+                    console.error(`Failed to create animation: ${key}`);
+                }
+            });
+        } catch (error) {
+            console.error(`Error creating ${textureKey} follower animations:`, error);
+        }
+    }
+    
+    /**
+     * Play animation based on direction
+     */
+    playAnimation(direction) {
+        if (!this.usesAnimations) return;
+        
+        const textureKey = this.texture.key;
+        const animKey = `${textureKey}_walk_${direction}`;
+        
+        // Reset any flipping or transformations
+        this.setFlipX(false);
+        this.setFlipY(false);
+        this.setScale(0.75); // Same scale as player
+        this.setOrigin(0.5, 0.65); // Center origin
+        
+        // Important: Reset angle to 0 to prevent upside-down sprites
+        this.angle = 0;
+        
+        try {
+            // Check if animation exists
+            if (this.scene.anims.exists(animKey)) {
+                // Play the animation if it's not already playing
+                if (!this.anims.isPlaying || this.anims.currentAnim.key !== animKey) {
+                    console.log(`Playing animation: ${animKey}`);
+                    this.play(animKey, true);
+                }
+            } else {
+                console.warn(`Animation ${animKey} not found for follower`);
+                
+                // Try to recreate animations before falling back to static frame
+                if (!this._retriedAnimations) {
+                    console.log(`Attempting to recreate animations for ${textureKey}`);
+                    this.createAnimations();
+                    this._retriedAnimations = true;
+                    
+                    // Try again to play the animation
+                    if (this.scene.anims.exists(animKey)) {
+                        this.play(animKey, true);
+                        return;
+                    }
+                }
+                
+                // Fallback to static frame if animation still doesn't exist
+                const frameIndex = 
+                    direction === 'down' ? 0 : 
+                    direction === 'left' ? 4 : 
+                    direction === 'right' ? 8 : 
+                    direction === 'up' ? 12 : 0;
+                    
+                console.log(`Using static frame ${frameIndex} for ${direction}`);
+                this.setFrame(frameIndex);
+            }
+        } catch (error) {
+            console.error(`Error playing follower animation ${animKey}:`, error);
+            
+            // Fallback to static frame
+            const frameIndex = 
+                direction === 'down' ? 0 : 
+                direction === 'left' ? 4 : 
+                direction === 'right' ? 8 : 
+                direction === 'up' ? 12 : 0;
+                
+            console.log(`Error fallback: Using static frame ${frameIndex}`);
+            this.setFrame(frameIndex);
+        }
     }
     
     /**
@@ -128,6 +324,14 @@ export default class Follower extends Character {
      */
     update(time, delta) {
         super.update(time, delta);
+        
+        // Update animations for sprite-based followers
+        if (this.usesAnimations && this.direction) {
+            this.playAnimation(this.direction);
+            // Ensure angle is always 0 for animated followers
+            this.angle = 0;
+        }
+        // Update angle for non-sprite followers (handled by Character.update now)
         
         // Update engineer abilities
         if (this.isEngineerFollower && this.active) {

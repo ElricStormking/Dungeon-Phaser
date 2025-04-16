@@ -201,6 +201,16 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
      * Set angle based on direction string
      */
     setAngleFromDirection() {
+        // Don't set angle for sprite-based characters (warrior, mage, and archer)
+        // or characters with usesAnimations flag
+        if (this.texture.key === 'warrior' || 
+            this.texture.key === 'mage' || 
+            this.texture.key === 'archer' ||
+            this.usesAnimations) {
+            return;
+        }
+        
+        // Only set angle for non-sprite characters (like basic followers)
         switch (this.direction) {
             case 'left': this.angle = 180; break;
             case 'right': this.angle = 0; break;
@@ -265,8 +275,12 @@ export default class Character extends Phaser.Physics.Arcade.Sprite {
             this.updateHealthBar();
         }
         
-        // Don't automatically update angle for sprite sheet animations
-        if (this.texture.key !== 'warrior') {
+        // Don't automatically update angle for sprite sheet animations (warrior, mage, archer)
+        // or characters with usesAnimations flag
+        if (this.texture.key !== 'warrior' && 
+            this.texture.key !== 'mage' && 
+            this.texture.key !== 'archer' && 
+            !this.usesAnimations) {
             this.setAngleFromDirection();
         }
     }

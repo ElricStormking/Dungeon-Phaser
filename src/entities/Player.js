@@ -9,8 +9,18 @@ import * as VisualEffects from '../utils/VisualEffects.js';
  */
 export default class Player extends Character {
     constructor(scene, x, y, heroClass) {
-        // Use the warrior sprite sheet instead of the default 'player' texture
-        super(scene, x, y, 'warrior', {
+        // Use the hero class texture instead of hardcoding 'warrior'
+        const textureKey = heroClass.key || 'warrior';
+        
+        console.log(`Creating Player with texture key: ${textureKey}`);
+        
+        // Check if texture exists
+        if (!scene.textures.exists(textureKey)) {
+            console.error(`Texture ${textureKey} not found in scene! Available textures:`, 
+                scene.textures.list.map(t => t.key).join(', '));
+        }
+        
+        super(scene, x, y, textureKey, {
             health: 50,
             maxHealth: 50,
             direction: 'right',
@@ -49,11 +59,15 @@ export default class Player extends Character {
         
         // Start with default animation - with error handling
         try {
-            if (scene.anims.exists('walk_down')) {
-                this.play('walk_down');
-                console.log('Playing initial walk_down animation');
+            // Use texture-specific animation key
+            const defaultAnim = `${textureKey}_walk_down`;
+            if (scene.anims.exists(defaultAnim)) {
+                this.play(defaultAnim);
+                console.log(`Playing initial ${defaultAnim} animation`);
             } else {
-                console.warn('Initial walk_down animation not available, using static frame');
+                console.warn(`Initial ${defaultAnim} animation not available, using static frame`);
+                console.warn(`Available animations:`, 
+                    Object.keys(scene.anims.anims.entries).join(', '));
                 this.setFrame(0); // Set to first frame as fallback
             }
         } catch (error) {
@@ -68,66 +82,83 @@ export default class Player extends Character {
     createAnimations() {
         const scene = this.scene;
         const anims = scene.anims;
+        const textureKey = this.heroClass.key || 'warrior';
         
         try {
-            console.log('Creating player animations');
+            console.log(`Creating ${textureKey} animations`);
             
-            // Force recreate animations to ensure they use the correct sprite sheet dimensions
-            const animsToCreate = ['walk_down', 'walk_left', 'walk_right', 'walk_up'];
+            // Check if texture exists first
+            if (!scene.textures.exists(textureKey)) {
+                console.error(`Cannot create animations: Texture ${textureKey} not found!`);
+                console.log('Available textures:', Object.keys(scene.textures.list)
+                    .filter(key => key !== '__DEFAULT' && key !== '__MISSING')
+                    .join(', '));
+                return;
+            }
             
-            // Remove existing animations if they exist (to ensure proper recreation)
-            animsToCreate.forEach(key => {
+            // Define the animation frame mappings - standard for all character spritesheets
+            // Based on actual sprite sheet layouts from the JSON files
+            const animationFrames = {
+                'down': { start: 0, end: 3 },    // First row (frames 0-3)
+                'left': { start: 4, end: 7 },    // Second row (frames 4-7)
+                'right': { start: 8, end: 11 },  // Third row (frames 8-11)
+                'up': { start: 12, end: 15 }     // Fourth row (frames 12-15)
+            };
+            
+            // Create prefixed animation keys - NOTE: JSON files use 'up' not 'back'
+            const animKeys = Object.keys(animationFrames).map(dir => `${textureKey}_walk_${dir}`);
+            
+            // Remove existing animations if they exist
+            animKeys.forEach(key => {
                 if (anims.exists(key)) {
                     anims.remove(key);
                     console.log(`Removed existing animation: ${key}`);
                 }
             });
             
-            // Down-facing animations (first row - frames 0-3)
-            anims.create({
-                key: 'walk_down',
-                frames: anims.generateFrameNumbers('warrior', { start: 0, end: 3 }),
-                frameRate: 6,
-                repeat: -1
+            // Also check for and remove any 'back' animations that might exist from previous versions
+            const backKey = `${textureKey}_walk_back`;
+            if (anims.exists(backKey)) {
+                anims.remove(backKey);
+                console.log(`Removed obsolete animation: ${backKey}`);
+            }
+            
+            // Create all animations directly from the spritesheet
+            Object.entries(animationFrames).forEach(([direction, frames]) => {
+                const key = `${textureKey}_walk_${direction}`;
+                
+                anims.create({
+                    key: key,
+                    frames: anims.generateFrameNumbers(textureKey, { 
+                        start: frames.start, 
+                        end: frames.end 
+                    }),
+                    frameRate: 6,
+                    repeat: -1
+                });
+                
+                console.log(`Created animation: ${key} with frames ${frames.start}-${frames.end}`);
             });
             
-            // Left-facing animations (second row - frames 4-7)
-            anims.create({
-                key: 'walk_left',
-                frames: anims.generateFrameNumbers('warrior', { start: 4, end: 7 }),
-                frameRate: 6,
-                repeat: -1
-            });
-            
-            // Right-facing animations (third row - frames 8-11)
-            anims.create({
-                key: 'walk_right',
-                frames: anims.generateFrameNumbers('warrior', { start: 8, end: 11 }),
-                frameRate: 6,
-                repeat: -1
-            });
-            
-            // Up-facing animations (fourth row - frames 12-15)
-            anims.create({
-                key: 'walk_up',
-                frames: anims.generateFrameNumbers('warrior', { start: 12, end: 15 }),
-                frameRate: 6,
-                repeat: -1
-            });
-            
-            console.log('Player animations created successfully');
-            
-            // Verify animations were created
-            animsToCreate.forEach(key => {
+            // Verify all animations were created
+            let allCreated = true;
+            animKeys.forEach(key => {
                 if (anims.exists(key)) {
                     console.log(`Animation verified: ${key}`);
                 } else {
                     console.error(`Failed to create animation: ${key}`);
+                    allCreated = false;
                 }
             });
             
+            if (allCreated) {
+                console.log(`All ${textureKey} animations created successfully`);
+            } else {
+                console.error(`Some ${textureKey} animations failed to create`);
+            }
+            
         } catch (error) {
-            console.error('Error creating player animations:', error);
+            console.error(`Error creating ${textureKey} animations:`, error);
         }
     }
     
@@ -430,66 +461,99 @@ export default class Player extends Character {
         // Get reference to scene
         const scene = this.scene;
         
-        // Check if we can shoot
-        if (!scene.bullets) return false;
+        // Create a frost wave effect that freezes all enemies
+        const wave = scene.add.sprite(this.x, this.y, 'bullet');
+        wave.setScale(0.5);
+        wave.setTint(0xADD8E6); // Light blue color
+        wave.setAlpha(0.8);
         
-        // Create frost bolt sprite directly
-        const bolt = new Phaser.Physics.Arcade.Sprite(scene, this.x, this.y, 'bullet');
-        scene.add.existing(bolt);
-        scene.physics.add.existing(bolt);
-        scene.bullets.add(bolt);
-        
-        // Set bolt properties
-        bolt.setTint(0x00FFFF);
-        bolt.damage = 1;
-        bolt.freezeEffect = true;
-        
-        // Set velocity directly
-        const speed = 350;
-        bolt.body.velocity.x = dx * speed;
-        bolt.body.velocity.y = dy * speed;
-        bolt.rotation = Math.atan2(dy, dx);
-        
-        // Add particle trail using older emitter syntax that's more reliable
-        const emitter = scene.add.particles('particle').createEmitter({
-            speed: 20,
-            scale: { start: 0.3, end: 0 },
-            blendMode: 'ADD',
-            lifespan: 300,
-            tint: 0x00FFFF,
-            follow: bolt,
-            quantity: 2,
-            frequency: 20
+        // Create expanding frost wave effect
+        scene.tweens.add({
+            targets: wave,
+            scale: 10,
+            alpha: 0,
+            duration: 600,
+            ease: 'Power2',
+            onComplete: () => wave.destroy()
         });
         
-        // Make sure emitter is cleaned up properly
-        bolt.on('destroy', () => {
-            emitter.stop();
-            scene.time.delayedCall(300, () => {
-                if (emitter && !emitter.destroyed) {
-                    emitter.manager.destroy();
+        // Freeze all active enemies for a short period
+        const freezeDuration = 1500; // 1.5 seconds of freeze
+        
+        if (scene.enemies && scene.enemies.getChildren) {
+            scene.enemies.getChildren().forEach(enemy => {
+                if (enemy && enemy.active) {
+                    // Use the enemy's built-in frost mechanism if it exists
+                    if (enemy.applyFrost && typeof enemy.applyFrost === 'function') {
+                        // Completely freeze the enemy (slowFactor = 0)
+                        enemy.applyFrost(freezeDuration, 0);
+                        
+                        // Force velocity to zero to ensure they're completely frozen
+                        if (enemy.body) {
+                            enemy.body.velocity.x = 0;
+                            enemy.body.velocity.y = 0;
+                        }
+                    } else {
+                        // Fallback for enemies without the applyFrost method
+                        // Store the enemy's original speed
+                        if (!enemy.originalSpeed) {
+                            enemy.originalSpeed = enemy.speed || 100;
+                        }
+                        
+                        // Apply freeze effect
+                        enemy.isFrozen = true;
+                        enemy.speed = 0;
+                        enemy.setTint(0xADD8E6); // Light blue color
+                        
+                        // Force velocity to zero
+                        if (enemy.body) {
+                            enemy.body.velocity.x = 0;
+                            enemy.body.velocity.y = 0;
+                        }
+                        
+                        // Add frost particles to the enemy
+                        try {
+                            const frostParticles = scene.add.particles(enemy.x, enemy.y, 'particle', {
+                                follow: enemy,
+                                scale: { start: 0.2, end: 0 },
+                                speed: 5,
+                                lifespan: 300,
+                                quantity: 1,
+                                frequency: 50,
+                                tint: 0xADD8E6 // Light blue color
+                            });
+                            
+                            // Store particles reference for cleanup
+                            enemy.frostParticles = frostParticles;
+                            
+                            // Remove frost effect after duration
+                            scene.time.delayedCall(freezeDuration, () => {
+                                if (enemy && enemy.active) {
+                                    enemy.isFrozen = false;
+                                    enemy.speed = enemy.originalSpeed;
+                                    enemy.clearTint();
+                                    
+                                    if (enemy.frostParticles && enemy.frostParticles.active) {
+                                        enemy.frostParticles.destroy();
+                                        enemy.frostParticles = null;
+                                    }
+                                }
+                            });
+                        } catch (error) {
+                            console.error('Error applying frost effect:', error);
+                            // Ensure enemy unfreezes even if particles fail
+                            scene.time.delayedCall(freezeDuration, () => {
+                                if (enemy && enemy.active) {
+                                    enemy.isFrozen = false;
+                                    enemy.speed = enemy.originalSpeed;
+                                    enemy.clearTint();
+                                }
+                            });
+                        }
+                    }
                 }
             });
-        });
-        
-        // Set up out-of-bounds check
-        scene.time.addEvent({
-            delay: 100,
-            callback: () => {
-                if (!bolt.active) return;
-                
-                const bounds = scene.physics.world.bounds;
-                const buffer = 50;
-                
-                if (bolt.x < bounds.x - buffer ||
-                    bolt.x > bounds.x + bounds.width + buffer ||
-                    bolt.y < bounds.y - buffer ||
-                    bolt.y > bounds.y + bounds.height + buffer) {
-                    bolt.destroy();
-                }
-            },
-            loop: true
-        });
+        }
         
         return true;
     }
@@ -522,30 +586,30 @@ export default class Player extends Character {
         // Update animation based on movement direction
         if (this.direction) {
             // Define animation based on direction
+            const textureKey = this.heroClass.key || 'warrior';
             let animKey;
-            let flipX = false;
             
+            // Determine animation key based on direction - no flipping needed
             switch (this.direction) {
                 case 'up':
-                    animKey = 'walk_up';
+                    animKey = `${textureKey}_walk_up`;
                     break;
                 case 'down':
-                    animKey = 'walk_down';
+                    animKey = `${textureKey}_walk_down`;
                     break;
                 case 'left':
-                    animKey = 'walk_left';
-                    flipX = false;
+                    animKey = `${textureKey}_walk_left`;
                     break;
                 case 'right':
-                    animKey = 'walk_right';
-                    flipX = false;
+                    animKey = `${textureKey}_walk_right`;
                     break;
                 default:
-                    animKey = 'walk_down';
+                    animKey = `${textureKey}_walk_down`;
             }
             
-            // Set horizontal flip
-            this.setFlipX(flipX);
+            // Ensure no flipping is applied to any character
+            this.setFlipX(false);
+            this.setFlipY(false);
             
             // Try to play the animation with error handling
             try {
@@ -587,5 +651,8 @@ export default class Player extends Character {
                              this.direction === 'up' ? 12 : 0);
             }
         }
+        
+        // Call parent update method to handle common functionality
+        super.update(time, delta);
     }
 } 

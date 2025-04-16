@@ -4,6 +4,7 @@ import { TILE_SIZE } from '../constants.js';
 // Hero classes with different abilities
 export const heroClasses = {
     warrior: {
+        key: 'warrior',
         name: 'Warrior',
         color: 0x00FFFF, // Note: TitleScene uses 0xFF0000, game uses 0x00FFFF. Standardize?
         specialAttack: function(scene, player, enemies, helpers) { // Pass needed functions/data
@@ -95,6 +96,7 @@ export const heroClasses = {
         }
     },
     archer: {
+        key: 'archer',
         name: 'Archer',
         color: 0x00FF00,
         specialAttack: function(scene, player, enemies, helpers) {
@@ -154,6 +156,7 @@ export const heroClasses = {
         }
     },
     mage: {
+        key: 'mage',
         name: 'Mage',
         color: 0xFF00FF, // Note: TitleScene uses 0x00FFFF, game uses 0xFF00FF. Standardize?
         specialAttack: function(scene, player, enemies, helpers) { // Pass needed functions/data
