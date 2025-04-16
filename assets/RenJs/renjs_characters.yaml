@@ -1,0 +1,134 @@
+characters:
+  Ere:
+    color: '#FFFFFF'
+    name: Ere
+    sprites:
+      普通: ere.png
+  Erin:
+    color: '#FFFFFF'
+    name: Erin
+    sprites:
+      普通: erin.png
+  Evelyn:
+    color: '#FFFFFF'
+    name: Evelyn
+    sprites:
+      普通: evelyn.png
+  Hard:
+    color: '#FFFFFF'
+    name: Hard
+    sprites:
+      普通: hard.png
+  Huntress1:
+    color: '#FFFFFF'
+    name: 女獵手
+    sprites:
+      普通: huntress1.png
+  Jenna:
+    color: '#FFFFFF'
+    name: Jenna
+    sprites:
+      普通: jenna.png
+  Jessica:
+    color: '#FFFFFF'
+    name: Jessica
+    sprites:
+      普通: jessica.png
+  Karen:
+    color: '#FFFFFF'
+    name: Karen
+    sprites:
+      普通: karen.png
+  Keeper1:
+    color: '#FFFFFF'
+    name: 看守人
+    sprites:
+      普通: keeper1.png
+  Keisha:
+    color: '#FFFFFF'
+    name: Keisha
+    sprites:
+      普通: keisha.png
+  Lena:
+    color: '#FFFFFF'
+    name: Lena
+    sprites:
+      普通: lena.png
+  Lilith:
+    color: '#FFFFFF'
+    name: Lilith
+    sprites:
+      普通: lilith.png
+  Lucy:
+    color: '#FFFFFF'
+    name: Lucy
+    sprites:
+      普通: lucy.png
+  Maid1:
+    color: '#FFFFFF'
+    name: 女僕
+    sprites:
+      普通: maid1.png
+  Mia:
+    color: '#FFFFFF'
+    name: Mia
+    sprites:
+      普通: mia.png
+  Millie:
+    color: '#FFFFFF'
+    name: Millie
+    sprites:
+      普通: millie.png
+  Narrator:
+    color: '#FFFFFF'
+    name: 旁白
+  Nia:
+    color: '#FFFFFF'
+    name: Nia
+    sprites:
+      普通: nia.png
+  Quick:
+    color: '#FFFFFF'
+    name: Quick
+    sprites:
+      普通: quick.png
+  Rhea:
+    color: '#FFFFFF'
+    name: Rhea
+    sprites:
+      普通: rhea.png
+  Sandy:
+    color: '#FFFFFF'
+    name: Sandy
+    sprites:
+      普通: sandy.png
+  Semia:
+    color: '#FFFFFF'
+    name: Semia
+    sprites:
+      普通: semia.png
+  Small:
+    color: '#FFFFFF'
+    name: Small
+    sprites:
+      普通: small.png
+  Soft:
+    color: '#FFFFFF'
+    name: Soft
+    sprites:
+      普通: soft.png
+  Sona:
+    color: '#FFFFFF'
+    name: Sona
+    sprites:
+      普通: sona.png
+  Thanonda:
+    color: '#FFFFFF'
+    name: Thanonda
+    sprites:
+      普通: thanonda.png
+  Vera:
+    color: '#FFFFFF'
+    name: Vera
+    sprites:
+      普通: vera.png
