@@ -14,6 +14,26 @@ export default class Follower extends Character {
                 textureKey = 'Chronotemporal';
             } else if (config.engineerClass.name === 'Voltaic') {
                 textureKey = 'Voltaic';
+            } else if (config.engineerClass.name === 'Thunder Mage') {
+                textureKey = 'Thunder Mage';
+            } else if (config.engineerClass.name === 'Sniper') {
+                textureKey = 'Sniper';
+            } else if (config.engineerClass.name === 'Ice Mage') {
+                textureKey = 'Ice Mage';
+            } else if (config.engineerClass.name === 'Dark Mage') {
+                textureKey = 'Dark Mage';
+            } else if (config.engineerClass.name === 'Ninja') {
+                textureKey = 'Ninja';
+            } else if (config.engineerClass.name === 'Shotgunner') {
+                textureKey = 'Shotgunner';
+            } else if (config.engineerClass.name === 'Goblin Trapper') {
+                textureKey = 'Goblin Trapper';
+            } else if (config.engineerClass.name === 'Shaman') {
+                textureKey = 'Shaman';
+            } else if (config.engineerClass.name === 'Holy Bard') {
+                textureKey = 'Holy Bard';
+            } else if (config.engineerClass.name === 'Shroom Pixie') {
+                textureKey = 'Shroom Pixie';
             }
         }
         
@@ -42,7 +62,7 @@ export default class Follower extends Character {
             this.initEngineerCooldown();
             
             // Set up animations for sprite-based followers
-            const animatedClasses = ['Chronotemporal', 'Voltaic'];
+            const animatedClasses = ['Chronotemporal', 'Voltaic', 'Thunder Mage', 'Sniper', 'Ice Mage', 'Dark Mage', 'Ninja', 'Shotgunner', 'Goblin Trapper', 'Shaman', 'Holy Bard', 'Shroom Pixie'];
             if (animatedClasses.includes(this.engineerClass.name)) {
                 console.log(`Creating ${this.engineerClass.name} follower with special animations`);
                 this.usesAnimations = true;

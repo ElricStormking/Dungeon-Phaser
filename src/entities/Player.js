@@ -272,15 +272,16 @@ export default class Player extends Character {
      * Warrior-specific basic attack (sword sweep)
      */
     performWarriorAttack(angle, enemies) {
-        const distance = TILE_SIZE * 2.5; // Range
+        const distance = TILE_SIZE * 3; // Range
+        const visualDistance = TILE_SIZE * 3.5; // Visual range (longer than collision range)
         const arc = 1.2; // Radians (about 70 degrees)
         
         // Create sword sprite instead of basic graphics
         const sword = this.scene.add.sprite(this.x, this.y, 'bullet');
         sword.setTint(0xFFFFFF);
         sword.setAlpha(0.8);
-        sword.setScale(3, 0.5); // Long and thin like a sword
-        sword.setOrigin(0, 0.5); // Set origin to left-center for rotation
+        sword.setScale(4.5, 0.5); // Increased length from 3 to 4.5 for longer sword
+        sword.setOrigin(-0.5, 0.5); // Set origin to left-center for rotation
         sword.setDepth(this.depth + 1);
         
         // Set initial angle
@@ -294,12 +295,16 @@ export default class Player extends Character {
             ease: 'Sine.easeInOut',
             onUpdate: () => {
                 // Add particles along the sword edge for trail effect
-                const tipX = sword.x + Math.cos(sword.rotation) * distance;
-                const tipY = sword.y + Math.sin(sword.rotation) * distance;
+                const tipX = sword.x + Math.cos(sword.rotation) * visualDistance;
+                const tipY = sword.y + Math.sin(sword.rotation) * visualDistance;
+                
+                // Add particles at mid-point too for a fuller effect
+                const midX = sword.x + Math.cos(sword.rotation) * (visualDistance * 0.6);
+                const midY = sword.y + Math.sin(sword.rotation) * (visualDistance * 0.6);
                 
                 try {
                     // Add particle at tip of sword
-                    const particles = this.scene.add.particles(tipX, tipY, 'particle', {
+                    const tipParticles = this.scene.add.particles(tipX, tipY, 'particle', {
                         lifespan: 200,
                         scale: { start: 0.4, end: 0 },
                         quantity: 1,
@@ -307,9 +312,19 @@ export default class Player extends Character {
                         tint: 0xFFFFFF
                     });
                     
+                    // Add particle at mid-point of sword
+                    const midParticles = this.scene.add.particles(midX, midY, 'particle', {
+                        lifespan: 180,
+                        scale: { start: 0.3, end: 0 },
+                        quantity: 1,
+                        alpha: { start: 0.4, end: 0 },
+                        tint: 0xFFFFFF
+                    });
+                    
                     // Clean up particles
                     this.scene.time.delayedCall(200, () => {
-                        if (particles) particles.destroy();
+                        if (tipParticles) tipParticles.destroy();
+                        if (midParticles) midParticles.destroy();
                     });
                 } catch (e) {
                     // Continue even if particles can't be created
@@ -318,20 +333,36 @@ export default class Player extends Character {
             onComplete: () => sword.destroy()
         });
         
-        // Damage check (same as before)
-        const attackBounds = new Phaser.Geom.Polygon([
-            this.x, this.y,
-            this.x + Math.cos(angle - arc/2) * distance, 
-            this.y + Math.sin(angle - arc/2) * distance,
-            this.x + Math.cos(angle + arc/2) * distance, 
-            this.y + Math.sin(angle + arc/2) * distance
-        ]);
+        // Create attack polygon points
+        const pointA = { x: this.x, y: this.y };
+        const pointB = { 
+            x: this.x + Math.cos(angle - arc/2) * distance, 
+            y: this.y + Math.sin(angle - arc/2) * distance 
+        };
+        const pointC = { 
+            x: this.x + Math.cos(angle + arc/2) * distance, 
+            y: this.y + Math.sin(angle + arc/2) * distance 
+        };
         
         let hitCount = 0;
         
         enemies.children.each(enemy => {
             if (!enemy.active) return;
-            if (Phaser.Geom.Intersects.RectangleToPolygon(enemy.getBounds(), attackBounds)) {
+            
+            // Get enemy bounds
+            const enemyBounds = enemy.getBounds();
+            
+            // Create a simpler collision check - check if the enemy's center is within our attack triangle
+            const enemyCenter = { x: enemyBounds.centerX, y: enemyBounds.centerY };
+            
+            // Check if enemy center is in attack triangle using point-in-triangle test
+            if (this.pointInTriangle(enemyCenter, pointA, pointB, pointC) || 
+                // Alternatively, check if any corner of the enemy is in the triangle
+                this.pointInTriangle({x: enemyBounds.left, y: enemyBounds.top}, pointA, pointB, pointC) ||
+                this.pointInTriangle({x: enemyBounds.right, y: enemyBounds.top}, pointA, pointB, pointC) ||
+                this.pointInTriangle({x: enemyBounds.left, y: enemyBounds.bottom}, pointA, pointB, pointC) ||
+                this.pointInTriangle({x: enemyBounds.right, y: enemyBounds.bottom}, pointA, pointB, pointC)) {
+                
                 enemy.damage(2);
                 
                 // Knockback
@@ -365,6 +396,25 @@ export default class Player extends Character {
         });
         
         return hitCount > 0;
+    }
+    
+    // Helper function to check if a point is inside a triangle
+    pointInTriangle(point, v1, v2, v3) {
+        // Calculate barycentric coordinates
+        const d1 = this.sign(point, v1, v2);
+        const d2 = this.sign(point, v2, v3);
+        const d3 = this.sign(point, v3, v1);
+
+        const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+        // If all same sign, point is in triangle
+        return !(hasNeg && hasPos);
+    }
+    
+    // Helper function for pointInTriangle
+    sign(p1, p2, p3) {
+        return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
     }
     
     /**

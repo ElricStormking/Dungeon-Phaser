@@ -130,6 +130,86 @@ export default class GameScene extends Phaser.Scene {
             spacing: 0
         });
         
+        console.log('Loading Thunder Mage spritesheet');
+        this.load.spritesheet('Thunder Mage', 'assets/images/characters/Thunder Mage.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Sniper spritesheet');
+        this.load.spritesheet('Sniper', 'assets/images/characters/Sniper.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Ice Mage spritesheet');
+        this.load.spritesheet('Ice Mage', 'assets/images/characters/Ice Mage.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Dark Mage spritesheet');
+        this.load.spritesheet('Dark Mage', 'assets/images/characters/Dark Mage.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Ninja spritesheet');
+        this.load.spritesheet('Ninja', 'assets/images/characters/Ninja.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Shotgunner spritesheet');
+        this.load.spritesheet('Shotgunner', 'assets/images/characters/Shotgunner.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Goblin Trapper spritesheet');
+        this.load.spritesheet('Goblin Trapper', 'assets/images/characters/Goblin Trapper.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Shaman spritesheet');
+        this.load.spritesheet('Shaman', 'assets/images/characters/Shaman.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Holy Bard spritesheet');
+        this.load.spritesheet('Holy Bard', 'assets/images/characters/Holy Bard.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
+        console.log('Loading Shroom Pixie spritesheet');
+        this.load.spritesheet('Shroom Pixie', 'assets/images/characters/Shroom Pixie.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+            margin: 0,
+            spacing: 0
+        });
+        
         // Note: We're no longer loading JSON animation files since we're creating
         // animations directly from the sprite sheet in the Player class
         
@@ -361,7 +441,14 @@ export default class GameScene extends Phaser.Scene {
             attack: Phaser.Input.Keyboard.KeyCodes.SPACE,
             special: Phaser.Input.Keyboard.KeyCodes.SHIFT,
             chrono: Phaser.Input.Keyboard.KeyCodes.C,
-            voltaic: Phaser.Input.Keyboard.KeyCodes.V
+            voltaic: Phaser.Input.Keyboard.KeyCodes.V,
+            darkMage: Phaser.Input.Keyboard.KeyCodes.M,
+            ninja: Phaser.Input.Keyboard.KeyCodes.N,
+            shotgunner: Phaser.Input.Keyboard.KeyCodes.G,
+            goblinTrapper: Phaser.Input.Keyboard.KeyCodes.T,
+            shaman: Phaser.Input.Keyboard.KeyCodes.H,
+            holyBard: Phaser.Input.Keyboard.KeyCodes.B,
+            shroomPixie: Phaser.Input.Keyboard.KeyCodes.P
         });
         
         // Enable pointer input for touch/mouse
@@ -379,6 +466,55 @@ export default class GameScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-V', () => {
             console.log('V key pressed - creating Voltaic follower');
             this.addVoltaicFollower();
+        });
+        
+        // Add debug key for Dark Mage follower
+        this.darkMageKey = this.input.keyboard.addKey('M');
+        this.input.keyboard.on('keydown-M', () => {
+            console.log('M key pressed - creating Dark Mage follower');
+            this.addDarkMageFollower();
+        });
+        
+        // Add debug key for Ninja follower
+        this.ninjaKey = this.input.keyboard.addKey('N');
+        this.input.keyboard.on('keydown-N', () => {
+            console.log('N key pressed - creating Ninja follower');
+            this.addNinjaFollower();
+        });
+        
+        // Add debug key for Shotgunner follower
+        this.shotgunnerKey = this.input.keyboard.addKey('G');
+        this.input.keyboard.on('keydown-G', () => {
+            console.log('G key pressed - creating Shotgunner follower');
+            this.addShotgunnerFollower();
+        });
+        
+        // Add debug key for Goblin Trapper follower
+        this.goblinTrapperKey = this.input.keyboard.addKey('T');
+        this.input.keyboard.on('keydown-T', () => {
+            console.log('T key pressed - creating Goblin Trapper follower');
+            this.addGoblinTrapperFollower();
+        });
+        
+        // Add debug key for Shaman follower
+        this.shamanKey = this.input.keyboard.addKey('H');
+        this.input.keyboard.on('keydown-H', () => {
+            console.log('H key pressed - creating Shaman follower');
+            this.addShamanFollower();
+        });
+        
+        // Add debug key for Holy Bard follower
+        this.holyBardKey = this.input.keyboard.addKey('B');
+        this.input.keyboard.on('keydown-B', () => {
+            console.log('B key pressed - creating Holy Bard follower');
+            this.addHolyBardFollower();
+        });
+        
+        // Add debug key for Shroom Pixie follower
+        this.shroomPixieKey = this.input.keyboard.addKey('P');
+        this.input.keyboard.on('keydown-P', () => {
+            console.log('P key pressed - creating Shroom Pixie follower');
+            this.addShroomPixieFollower();
         });
         
         // Add debug keys for spawning bosses (1-4)
@@ -1054,6 +1190,894 @@ export default class GameScene extends Phaser.Scene {
             });
         } else {
             console.error('Failed to create Voltaic follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Thunder Mage follower for animation testing
+     */
+    addThunderMageFollower() {
+        console.log('Adding Thunder Mage engineer follower for testing');
+        
+        // Get the Thunder Mage class data
+        const thunderMageClass = this.engineerClasses.thunderMage;
+        
+        if (!thunderMageClass) {
+            console.error('Thunder Mage class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Thunder Mage')) {
+            const texture = this.textures.get('Thunder Mage');
+            console.log('Thunder Mage texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Thunder Mage texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Thunder Mage', 'assets/images/characters/Thunder Mage.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Thunder Mage texture on demand');
+                this.createThunderMageFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(thunderMageClass);
+        
+        if (follower) {
+            console.log('Successfully created Thunder Mage follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Thunder Mage follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Thunder Mage follower');
+        }
+        
+        return follower;
+    }
+    
+    /**
+     * Create a Thunder Mage follower (called when texture is loaded on-demand)
+     */
+    createThunderMageFollower() {
+        if (this.engineerClasses.thunderMage) {
+            const follower = this.combatSystem.createClassFollower(this.engineerClasses.thunderMage);
+            if (follower) {
+                console.log('Created Thunder Mage follower after on-demand texture load');
+                
+                // Set scale and depth
+                follower.setScale(0.75);
+                follower.setDepth(10);
+                
+                // Set default animation
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                return follower;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Add a test Sniper follower for animation testing
+     */
+    addSniperFollower() {
+        console.log('Adding Sniper engineer follower for testing');
+        
+        // Get the Sniper class data
+        const sniperClass = this.engineerClasses.sniper;
+        
+        if (!sniperClass) {
+            console.error('Sniper class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Sniper')) {
+            const texture = this.textures.get('Sniper');
+            console.log('Sniper texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Sniper texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Sniper', 'assets/images/characters/Sniper.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Sniper texture on demand');
+                this.createSniperFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(sniperClass);
+        
+        if (follower) {
+            console.log('Successfully created Sniper follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Sniper follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Sniper follower');
+        }
+        
+        return follower;
+    }
+    
+    /**
+     * Create a Sniper follower (called when texture is loaded on-demand)
+     */
+    createSniperFollower() {
+        if (this.engineerClasses.sniper) {
+            const follower = this.combatSystem.createClassFollower(this.engineerClasses.sniper);
+            if (follower) {
+                console.log('Created Sniper follower after on-demand texture load');
+                
+                // Set scale and depth
+                follower.setScale(0.75);
+                follower.setDepth(10);
+                
+                // Set default animation
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                return follower;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Add a test Dark Mage follower for animation testing
+     */
+    addDarkMageFollower() {
+        console.log('Adding Dark Mage engineer follower for testing');
+        
+        // Get the Dark Mage class data
+        const darkMageClass = this.engineerClasses.darkMage;
+        
+        if (!darkMageClass) {
+            console.error('Dark Mage class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Dark Mage')) {
+            const texture = this.textures.get('Dark Mage');
+            console.log('Dark Mage texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Dark Mage texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Dark Mage', 'assets/images/characters/Dark Mage.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Dark Mage texture on demand');
+                this.createDarkMageFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createDarkMageFollower();
+    }
+    
+    /**
+     * Create a Dark Mage follower once the texture is loaded
+     * @private
+     */
+    createDarkMageFollower() {
+        // Get the Dark Mage class data
+        const darkMageClass = this.engineerClasses.darkMage;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(darkMageClass);
+        
+        if (follower) {
+            console.log('Successfully created Dark Mage follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Dark Mage follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Dark Mage follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Ninja follower for animation testing
+     */
+    addNinjaFollower() {
+        console.log('Adding Ninja engineer follower for testing');
+        
+        // Get the Ninja class data
+        const ninjaClass = this.engineerClasses.ninja;
+        
+        if (!ninjaClass) {
+            console.error('Ninja class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Ninja')) {
+            const texture = this.textures.get('Ninja');
+            console.log('Ninja texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Ninja texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Ninja', 'assets/images/characters/Ninja.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Ninja texture on demand');
+                this.createNinjaFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createNinjaFollower();
+    }
+    
+    /**
+     * Create a Ninja follower once the texture is loaded
+     * @private
+     */
+    createNinjaFollower() {
+        // Get the Ninja class data
+        const ninjaClass = this.engineerClasses.ninja;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(ninjaClass);
+        
+        if (follower) {
+            console.log('Successfully created Ninja follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Ninja follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Ninja follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Shotgunner follower for animation testing
+     */
+    addShotgunnerFollower() {
+        console.log('Adding Shotgunner engineer follower for testing');
+        
+        // Get the Shotgunner class data
+        const shotgunnerClass = this.engineerClasses.shotgunner;
+        
+        if (!shotgunnerClass) {
+            console.error('Shotgunner class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Shotgunner')) {
+            const texture = this.textures.get('Shotgunner');
+            console.log('Shotgunner texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Shotgunner texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Shotgunner', 'assets/images/characters/Shotgunner.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Shotgunner texture on demand');
+                this.createShotgunnerFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createShotgunnerFollower();
+    }
+    
+    /**
+     * Create a Shotgunner follower once the texture is loaded
+     * @private
+     */
+    createShotgunnerFollower() {
+        // Get the Shotgunner class data
+        const shotgunnerClass = this.engineerClasses.shotgunner;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(shotgunnerClass);
+        
+        if (follower) {
+            console.log('Successfully created Shotgunner follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Shotgunner follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Shotgunner follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Goblin Trapper follower for animation testing
+     */
+    addGoblinTrapperFollower() {
+        console.log('Adding Goblin Trapper engineer follower for testing');
+        
+        // Get the Goblin Trapper class data
+        const goblinTrapperClass = this.engineerClasses.goblinTrapper;
+        
+        if (!goblinTrapperClass) {
+            console.error('Goblin Trapper class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Goblin Trapper')) {
+            const texture = this.textures.get('Goblin Trapper');
+            console.log('Goblin Trapper texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Goblin Trapper texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Goblin Trapper', 'assets/images/characters/Goblin Trapper.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Goblin Trapper texture on demand');
+                this.createGoblinTrapperFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createGoblinTrapperFollower();
+    }
+    
+    /**
+     * Create a Goblin Trapper follower once the texture is loaded
+     * @private
+     */
+    createGoblinTrapperFollower() {
+        // Get the Goblin Trapper class data
+        const goblinTrapperClass = this.engineerClasses.goblinTrapper;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(goblinTrapperClass);
+        
+        if (follower) {
+            console.log('Successfully created Goblin Trapper follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Goblin Trapper follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Goblin Trapper follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Shaman follower for animation testing
+     */
+    addShamanFollower() {
+        console.log('Adding Shaman engineer follower for testing');
+        
+        // Get the Shaman class data
+        const shamanClass = this.engineerClasses.shaman;
+        
+        if (!shamanClass) {
+            console.error('Shaman class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Shaman')) {
+            const texture = this.textures.get('Shaman');
+            console.log('Shaman texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Shaman texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Shaman', 'assets/images/characters/Shaman.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Shaman texture on demand');
+                this.createShamanFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createShamanFollower();
+    }
+    
+    /**
+     * Create a Shaman follower once the texture is loaded
+     * @private
+     */
+    createShamanFollower() {
+        // Get the Shaman class data
+        const shamanClass = this.engineerClasses.shaman;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(shamanClass);
+        
+        if (follower) {
+            console.log('Successfully created Shaman follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Shaman follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Shaman follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Holy Bard follower for animation testing
+     */
+    addHolyBardFollower() {
+        console.log('Adding Holy Bard engineer follower for testing');
+        
+        // Get the Holy Bard class data
+        const holyBardClass = this.engineerClasses.holyBard;
+        
+        if (!holyBardClass) {
+            console.error('Holy Bard class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Holy Bard')) {
+            const texture = this.textures.get('Holy Bard');
+            console.log('Holy Bard texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Holy Bard texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Holy Bard', 'assets/images/characters/Holy Bard.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Holy Bard texture on demand');
+                this.createHolyBardFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createHolyBardFollower();
+    }
+    
+    /**
+     * Create a Holy Bard follower once the texture is loaded
+     * @private
+     */
+    createHolyBardFollower() {
+        // Get the Holy Bard class data
+        const holyBardClass = this.engineerClasses.holyBard;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(holyBardClass);
+        
+        if (follower) {
+            console.log('Successfully created Holy Bard follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Holy Bard follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Holy Bard follower');
+        }
+        
+        return follower;
+    }
+
+    /**
+     * Add a test Shroom Pixie follower for animation testing
+     */
+    addShroomPixieFollower() {
+        console.log('Adding Shroom Pixie engineer follower for testing');
+        
+        // Get the Shroom Pixie class data
+        const shroomPixieClass = this.engineerClasses.shroomPixie;
+        
+        if (!shroomPixieClass) {
+            console.error('Shroom Pixie class not found in engineerClasses!');
+            return;
+        }
+        
+        // Debug the texture to make sure it loaded properly
+        if (this.textures.exists('Shroom Pixie')) {
+            const texture = this.textures.get('Shroom Pixie');
+            console.log('Shroom Pixie texture info:', {
+                key: texture.key,
+                frameTotal: texture.frameTotal,
+                firstFrame: texture.get(0),
+                frames: Array.from({length: Math.min(texture.frameTotal, 16)}, (_, i) => i)
+            });
+        } else {
+            console.error('Shroom Pixie texture not found!');
+            
+            // Try to load the texture on-demand if it's missing
+            this.load.spritesheet('Shroom Pixie', 'assets/images/characters/Shroom Pixie.png', {
+                frameWidth: 96,
+                frameHeight: 96,
+                margin: 0,
+                spacing: 0
+            });
+            
+            // Start loading and create the follower when ready
+            this.load.once('complete', () => {
+                console.log('Loaded Shroom Pixie texture on demand');
+                this.createShroomPixieFollower();
+            });
+            
+            this.load.start();
+            return;
+        }
+        
+        return this.createShroomPixieFollower();
+    }
+    
+    /**
+     * Create a Shroom Pixie follower once the texture is loaded
+     * @private
+     */
+    createShroomPixieFollower() {
+        // Get the Shroom Pixie class data
+        const shroomPixieClass = this.engineerClasses.shroomPixie;
+        
+        // Use the combat system to create the engineer follower
+        const follower = this.combatSystem.createClassFollower(shroomPixieClass);
+        
+        if (follower) {
+            console.log('Successfully created Shroom Pixie follower with animations');
+            
+            // Set appropriate scale and depth
+            follower.setScale(0.75);
+            follower.setDepth(10);
+            
+            // Force angle to 0 to prevent upside-down sprites
+            follower.angle = 0;
+            
+            // Debug check all directions
+            this.time.delayedCall(500, () => {
+                console.log('Testing Shroom Pixie follower animations');
+                
+                // Force it to use down animation for testing
+                follower.direction = 'down';
+                follower.playAnimation('down');
+                
+                // Then after a delay, try each direction sequentially
+                const testDirections = ['down', 'left', 'right', 'up'];
+                testDirections.forEach((dir, i) => {
+                    this.time.delayedCall(1000 + 1000 * i, () => {
+                        console.log(`Testing ${dir} animation`);
+                        follower.setFlipX(false);
+                        follower.setFlipY(false);
+                        follower.angle = 0;
+                        follower.direction = dir;
+                        follower.playAnimation(dir);
+                    });
+                });
+            });
+        } else {
+            console.error('Failed to create Shroom Pixie follower');
         }
         
         return follower;

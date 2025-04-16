@@ -164,71 +164,72 @@ export const engineerClasses = {
         ability: 'Frost Nova',
         description: 'Creates an expanding ring of ice that freezes enemies',
         specialAttack: function(scene, follower, enemies, helpers) {
-            if (enemies.getLength() === 0) return false;
-            
             const novaRadius = TILE_SIZE * 5;
             const hitEnemies = new Set(); // Track enemies hit in this nova
 
+            // Create visual effect for the frost nova
             const nova = scene.add.graphics();
             nova.fillStyle(0xB0E0E6, 0.3);
             nova.fillCircle(follower.x, follower.y, 10);
             
+            // Animate the nova expanding outward
             scene.tweens.add({
                 targets: nova,
                 scale: novaRadius / 10,
                 duration: 500,
                 onUpdate: () => {
                     const currentRadius = 10 * nova.scale;
+                    
                     enemies.getChildren().forEach(enemy => {
                         if (!enemy.active || hitEnemies.has(enemy)) return;
                         
                         const distance = Phaser.Math.Distance.Between(follower.x, follower.y, enemy.x, enemy.y);
                         
-                        // Freeze enemies within the expanding radius, not just the edge
+                        // Freeze enemies as the nova expands
                         if (distance <= currentRadius && !enemy.isFrozen) { 
                             hitEnemies.add(enemy);
-                            enemy.frozenByNova = true; // Custom flag
+                            enemy.isFrozen = true;
                             enemy.setTint(0xB0E0E6);
                             
                             if (!enemy.originalSpeed) {
                                 enemy.originalSpeed = enemy.speed;
                             }
+                            
+                            // Completely stop the enemy
                             enemy.body.velocity.x = 0;
                             enemy.body.velocity.y = 0;
                             enemy.speed = 0;
                             
-                            // Track emitters on the enemy object for proper cleanup
+                            // Add ice particle effect
                             const emitter = scene.particleManager?.get() || scene.add.particles(enemy.x, enemy.y, 'particle', {
                                 speed: { min: 10, max: 20 },
                                 scale: { start: 0.5, end: 0 },
                                 lifespan: 1000,
                                 quantity: 1,
-                                frequency: 200, // Emits over time while frozen
+                                frequency: 200,
                                 tint: 0xB0E0E6
                             });
                             
-                            // Store reference on enemy
+                            // Store reference on enemy for cleanup
                             enemy.frostEmitter = emitter;
                             
-                            // Automatically destroy emitter after unfreeze delay + lifespan
-                            scene.time.delayedCall(2500 + 1000, () => {
-                                if (enemy.frostEmitter) safeDestroy(enemy.frostEmitter);
-                                enemy.frostEmitter = null;
-                            });
-
+                            // Deal damage when hit
                             damageEnemy(scene, enemy, 1);
                             
+                            // Unfreeze after delay
                             scene.time.delayedCall(2500, () => {
-                                if (enemy.active && enemy.frozenByNova) {
+                                if (enemy.active && enemy.isFrozen) {
                                     enemy.clearTint();
-                                    enemy.frozenByNova = false;
-                                    enemy.isFrozen = false; // General frozen flag
+                                    enemy.isFrozen = false;
                                     if (enemy.originalSpeed) {
                                          enemy.speed = enemy.originalSpeed; 
                                     }
                                 }
+                                
                                 if (enemy.frostEmitter) {
-                                    enemy.frostEmitter.stop(); // Stop emitting when unfrozen
+                                    enemy.frostEmitter.stop();
+                                    scene.time.delayedCall(1000, () => safeDestroy(enemy.frostEmitter));
+                                    enemy.frostEmitter = null;
                                 }
                             });
                         }
@@ -244,7 +245,7 @@ export const engineerClasses = {
                 }
             });
             
-            return true; // Assume it always fires
+            return true;
         }
     },
     ninja: {
@@ -814,114 +815,91 @@ export const engineerClasses = {
     },
     thunderMage: {
         name: 'Thunder Mage',
-        color: 0x7DF9FF, // Electric Blue
-        ability: 'Thunder Strike',
-        description: 'Calls down lightning bolts on nearby enemies',
+        color: 0xFFD700, // Gold
+        ability: 'Lightning Strike',
+        description: 'Summons lightning bolts that damage enemies',
         specialAttack: function(scene, follower, enemies, helpers) {
             if (enemies.getLength() === 0) return false;
             
-            // Define attack range
-            const attackRange = TILE_SIZE * 8;
+            const strikeRange = TILE_SIZE * 6;
+            const hitEnemies = new Set();
+            let affected = 0;
             
-            // Filter enemies to only those within range
-            const enemiesInRange = enemies.getChildren().filter(enemy => {
-                if (!enemy.active) return false;
+            // Find up to 3 random enemies within range
+            const nearbyEnemies = enemies.getChildren()
+                .filter(enemy => {
+                    if (!enemy.active) return false;
+                    const distance = Phaser.Math.Distance.Between(
+                        follower.x, follower.y, enemy.x, enemy.y
+                    );
+                    return distance <= strikeRange;
+                })
+                .sort(() => 0.5 - Math.random()) // Randomize order
+                .slice(0, 3); // Take up to 3
+            
+            if (nearbyEnemies.length === 0) return false;
+            
+            // Create lightning strikes for each target
+            nearbyEnemies.forEach(enemy => {
+                hitEnemies.add(enemy);
                 
-                const distance = Phaser.Math.Distance.Between(
-                    follower.x, follower.y,
-                    enemy.x, enemy.y
+                // Create a lightning strike effect
+                const strikeGraphics = createLightningEffect(
+                    scene, 
+                    enemy.x, enemy.y - 200, // Start above the enemy
+                    enemy.x, enemy.y,       // End at the enemy
+                    [],                     // Array to collect graphics objects
+                    0xFFD700,               // Gold color
+                    3                       // Line width
                 );
                 
-                return distance <= attackRange;
-            });
-            
-            // If no enemies in range, return false
-            if (enemiesInRange.length === 0) return false;
-            
-            // Reduce target count from 4 to 2
-            const strikeCount = Math.min(2, enemiesInRange.length);
-            const targetEnemies = Phaser.Utils.Array.Shuffle(enemiesInRange).slice(0, strikeCount);
-            
-            // Visual indicator for attack range (optional, remove if not wanted)
-            const rangeIndicator = scene.add.graphics();
-            rangeIndicator.lineStyle(2, 0x7DF9FF, 0.3);
-            rangeIndicator.strokeCircle(follower.x, follower.y, attackRange);
-            scene.tweens.add({
-                targets: rangeIndicator,
-                alpha: 0,
-                duration: 500,
-                onComplete: () => rangeIndicator.destroy()
-            });
-            
-            targetEnemies.forEach((enemy, index) => {
-                // Stagger the strikes slightly
-                scene.time.delayedCall(index * 150, () => {
-                    if (!enemy.active) return;
-
-                    const warningCircle = scene.add.graphics();
-                    warningCircle.fillStyle(0x7DF9FF, 0.3);
-                    warningCircle.fillCircle(enemy.x, enemy.y, TILE_SIZE * 1.5);
-                    scene.tweens.add({ targets: warningCircle, alpha: 0.7, duration: 300, yoyo: true, repeat: 1, onComplete: () => warningCircle.destroy() });
-
-                    scene.time.delayedCall(700, () => { // Delay strike after warning
-                        if (!enemy.active) return;
-
-                        const strikeHeight = 300;
-                        const lightning = scene.add.graphics();
-                        lightning.lineStyle(3, 0xFFFFFF, 1);
-                        helpers.createJaggedLine(lightning, enemy.x, enemy.y - strikeHeight, enemy.x, enemy.y, 6, 20);
-                        
-                        const glow = scene.add.graphics();
-                        glow.lineStyle(9, 0x7DF9FF, 0.5);
-                        glow.strokeLineShape(new Phaser.Geom.Line(enemy.x, enemy.y - strikeHeight, enemy.x, enemy.y));
-
-                        const flash = scene.add.rectangle(
-                            scene.cameras.main.worldView.x + scene.cameras.main.width / 2,
-                            scene.cameras.main.worldView.y + scene.cameras.main.height / 2,
-                            scene.cameras.main.width,
-                            scene.cameras.main.height,
-                            0xFFFFFF,
-                            0.2
-                        );
-                        scene.tweens.add({ targets: flash, alpha: 0, duration: 100, onComplete: () => flash.destroy() });
-
-                        const impact = scene.add.graphics();
-                        impact.fillStyle(0xFFFFFF, 0.8);
-                        impact.fillCircle(enemy.x, enemy.y, TILE_SIZE);
-
-                        const emitter = scene.add.particles(enemy.x, enemy.y, 'particle', {
-                            speed: { min: 50, max: 150 }, scale: { start: 0.5, end: 0 },
-                            lifespan: 500, quantity: 20, tint: [0x7DF9FF, 0xFFFFFF],
-                            emitting: false // Don't start emitting
-                        });
-                         if (!emitter) return;
-
-                        emitter.explode(); // Fire once
-                        // Destroy after lifespan
-                        scene.time.delayedCall(500, () => { if (emitter) emitter.destroy(); });
-                        
-                        helpers.damageEnemy(scene, enemy, 4);
-                        
-                        // Chain damage
-                        const chainRange = TILE_SIZE * 2;
-                        const lightningArray = [];
-                        enemies.getChildren().forEach(nearbyEnemy => {
-                            if (nearbyEnemy.active && nearbyEnemy !== enemy) {
-                                const distance = Phaser.Math.Distance.Between(enemy.x, enemy.y, nearbyEnemy.x, nearbyEnemy.y);
-                                if (distance < chainRange) {
-                                    helpers.damageEnemy(scene, nearbyEnemy, 2);
-                                    helpers.createLightningEffect(scene, enemy.x, enemy.y, nearbyEnemy.x, nearbyEnemy.y, lightningArray);
-                                }
-                            }
-                        });
-                        scene.time.delayedCall(200, () => lightningArray.forEach(l => l.destroy()));
-
-                        scene.time.delayedCall(200, () => { lightning.destroy(); glow.destroy(); impact.destroy(); });
-                    });
+                // Flash the enemy white
+                enemy.setTint(0xFFFFFF);
+                scene.time.delayedCall(150, () => {
+                    if (enemy.active) enemy.clearTint();
                 });
+                
+                // Damage the enemy
+                damageEnemy(scene, enemy, 2);
+                
+                // Create a local explosion effect
+                const explosion = scene.add.graphics();
+                explosion.fillStyle(0xFFD700, 0.7);
+                explosion.fillCircle(enemy.x, enemy.y, 20);
+                
+                // Animate the explosion
+                scene.tweens.add({
+                    targets: explosion,
+                    alpha: 0,
+                    scale: 2,
+                    duration: 300,
+                    onComplete: () => safeDestroy(explosion)
+                });
+                
+                // Clean up lightning after a short delay
+                scene.time.delayedCall(200, () => {
+                    // Fix: Check if strikeGraphics is an array before using forEach
+                    if (Array.isArray(strikeGraphics)) {
+                        strikeGraphics.forEach(line => safeDestroy(line));
+                    } else if (strikeGraphics) {
+                        // If it's a single graphics object, just destroy it
+                        safeDestroy(strikeGraphics);
+                    }
+                });
+                
+                affected++;
             });
             
-            return targetEnemies.length > 0;
+            // Create a thunder sound effect
+            if (scene.audioManager) {
+                try {
+                    scene.audioManager.playSFX('special');
+                } catch (error) {
+                    console.warn('Failed to play thunder sound:', error);
+                }
+            }
+            
+            return affected > 0;
         }
     },
     goblinTrapper: {
